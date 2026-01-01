@@ -1,0 +1,53 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# =========================
+# FastAPI / Runtime
+# =========================
+*.log
+
+# =========================
+# Databases & runtime data
+# =========================
+*.db
+*.sqlite
+*.sqlite3
+
+# =========================
+# Secrets (VERY IMPORTANT)
+# =========================
+.env
+.env.*
+*.key
+*.pem
+
+# =========================
+# Build / Packaging
+# =========================
+build/
+dist/
+*.spec
+
+# =========================
+# OS / IDE
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# =========================
+# PyInstaller cache
+# =========================
+__pyinstaller__/

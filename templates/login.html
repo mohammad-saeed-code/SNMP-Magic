@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login — SNMP Magic</title>
+
+  <link rel="stylesheet" href="/static/app.css" />
+
+  <style>
+    :root{
+      /* Pulled from your logo palette */
+      --lavender:#B3A0DF;
+      --violet:#C9C3F8;
+      --periwinkle:#CFCDFC;
+      --sky:#AED1F9;
+      --sky-strong:#8FBCF4;
+      --pale:#ECEEFC;
+
+      --ink:#0b1020;
+      --muted:#5b6a86;
+
+      --card: rgba(255,255,255,.70);
+      --border: rgba(179,160,223,.28);
+      --shadow: 0 24px 60px rgba(11,16,32,.14);
+
+      --focus: rgba(143,188,244,.32);
+      --btnText:#0b1020;
+
+      --danger-bg: rgba(255, 82, 82, .10);
+      --danger-bd: rgba(255, 82, 82, .22);
+      --danger-tx: #b91c1c;
+    }
+
+    *{ box-sizing:border-box; }
+
+    body{
+      margin:0;
+      min-height:100vh;
+      display:grid;
+      place-items:center;
+      color:var(--ink);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, sans-serif;
+      background: #ffffff;
+      overflow:hidden;
+    }
+
+    /* Animated pastel “aurora” background */
+    body::before,
+    body::after{
+      content:"";
+      position:fixed;
+      inset:-28%;
+      pointer-events:none;
+      z-index:0;
+    }
+
+    body::before{
+      background:
+        radial-gradient(780px 520px at 18% 25%, rgba(174,209,249,.55), transparent 62%),
+        radial-gradient(880px 560px at 82% 18%, rgba(201,195,248,.55), transparent 65%),
+        radial-gradient(820px 560px at 32% 85%, rgba(179,160,223,.42), transparent 62%),
+        radial-gradient(760px 540px at 90% 82%, rgba(143,188,244,.38), transparent 60%);
+      filter: blur(18px) saturate(1.08);
+      animation: auroraMove 20s ease-in-out infinite alternate;
+      opacity: 0.95;
+    }
+
+    body::after{
+      background:
+        linear-gradient(to right, rgba(201,195,248,.22) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(174,209,249,.18) 1px, transparent 1px);
+      background-size: 64px 64px;
+      mask-image: radial-gradient(circle at 50% 36%, rgba(0,0,0,.85), transparent 62%);
+      opacity: 0.25;
+      animation: gridDrift 26s linear infinite;
+    }
+
+    @keyframes auroraMove{
+      0%   { transform: translate(-2%, -2%) scale(1.02); }
+      50%  { transform: translate( 3%, -1%) scale(1.06); }
+      100% { transform: translate( 2%,  3%) scale(1.03); }
+    }
+    @keyframes gridDrift{
+      0%   { transform: translate(0,0); }
+      100% { transform: translate(-64px, -64px); }
+    }
+
+    @media (prefers-reduced-motion: reduce){
+      body::before, body::after { animation:none !important; }
+      .wrap { animation:none !important; }
+    }
+
+    .wrap{
+      position:relative;
+      z-index:1;
+      width:100%;
+      max-width: 460px;
+      padding: 26px 26px 22px;
+      border-radius: 20px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(14px);
+      box-shadow: var(--shadow);
+      animation: cardFloat 10s ease-in-out infinite;
+    }
+    @keyframes cardFloat{
+      0%,100%{ transform: translateY(0px); }
+      50%    { transform: translateY(-4px); }
+    }
+
+    /* Logo block */
+    .logo{
+      display:flex;
+      justify-content:center;
+      margin: 2px 0 10px;
+    }
+    .logo img{
+      width: 260px;
+      height:auto;
+      filter: drop-shadow(0 10px 24px rgba(11,16,32,.10));
+      user-select:none;
+      -webkit-user-drag:none;
+    }
+
+    h1{
+      font-size: 20px;
+      margin: 0 0 6px;
+      text-align:center;
+      letter-spacing: .2px;
+    }
+
+    .muted{
+      font-size: 13px;
+      color: var(--muted);
+      text-align:center;
+      margin-bottom: 18px;
+      line-height: 1.35;
+    }
+
+    label{
+      display:block;
+      font-size: 12px;
+      color: rgba(11,16,32,.72);
+      margin: 12px 0 6px;
+    }
+
+    input{
+      width:100%;
+      padding: 11px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(179,160,223,.26);
+      background: rgba(255,255,255,.86);
+      color: var(--ink);
+      outline:none;
+      transition: border .15s, box-shadow .15s, transform .08s;
+    }
+    input:focus{
+      border-color: rgba(143,188,244,.85);
+      box-shadow: 0 0 0 3px var(--focus);
+    }
+
+    .btn{
+      margin-top: 16px;
+      width:100%;
+      padding: 12px;
+      border-radius: 14px;
+      border: none;
+      font-weight: 700;
+      color: var(--btnText);
+      background: linear-gradient(135deg, var(--sky), var(--violet));
+      cursor:pointer;
+      transition: transform .12s, box-shadow .12s, filter .12s;
+    }
+    .btn:hover{
+      filter: brightness(1.02);
+      box-shadow: 0 14px 30px rgba(143,188,244,.26);
+    }
+    .btn:active{ transform: translateY(1px); }
+
+    .err{
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-bd);
+      color: var(--danger-tx);
+      font-size: 13px;
+    }
+
+    .toplinks{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-top: 16px;
+      font-size: 12px;
+    }
+    a{
+      color: rgba(102, 89, 178, .95);
+      text-decoration:none;
+    }
+    a:hover{ text-decoration: underline; }
+
+    .footer{
+      margin-top: 10px;
+      text-align:center;
+      font-size: 11px;
+      color: rgba(11,16,32,.46);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="logo">
+      <!-- Update src to wherever you place the logo -->
+      <img src="/static/img/snmp-magic-logo.png" alt="SNMP Magic" />
+    </div>
+
+    <h1>Sign in</h1>
+    <div class="muted">Secure access required to manage and scan your network.</div>
+
+    <form method="post" action="/login">
+      <input type="hidden" name="next" value="{{ next }}" />
+
+      <label for="username">Username</label>
+      <input id="username" name="username" autocomplete="username" required />
+
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required />
+
+      <button class="btn" type="submit">Login</button>
+
+      {% if error %}
+        <div class="err">{{ error }}</div>
+      {% endif %}
+    </form>
+
+    <div class="toplinks">
+      <span></span>
+      <a href="/health">Health</a>
+    </div>
+
+    <div class="footer">© 2025 SNMP Magic</div>
+  </div>
+</body>
+</html>

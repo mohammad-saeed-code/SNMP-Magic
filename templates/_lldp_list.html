@@ -1,0 +1,22 @@
+<div class="space-y-3">
+  {% if lldp %}
+    {% for local_if, peers in lldp.items() %}
+      <div class="card">
+        <div class="text-sm font-semibold mb-2">{{ local_if }}</div>
+        <ul class="list-disc pl-5 space-y-1 text-sm">
+          {% for p in peers %}
+            <li>
+              <span class="font-medium">{{ p.get('sysName') or '?' }}</span>
+              <span class="text-gray-500">/ {{ p.get('portId') or '?' }}</span>
+              {% if p.get('portDesc') %}
+                <span class="text-gray-400">({{ p.get('portDesc') }})</span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endfor %}
+  {% else %}
+    <div class="text-sm text-gray-500">No LLDP neighbors found.</div>
+  {% endif %}
+</div>

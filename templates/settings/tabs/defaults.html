@@ -1,0 +1,39 @@
+<h2 class="text-lg font-semibold mb-3">Scan Defaults</h2>
+
+{% if error %}
+  <div class="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">{{ error }}</div>
+{% endif %}
+{% if ok %}
+  <div class="mb-3 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-900">{{ ok }}</div>
+{% endif %}
+
+<form hx-post="/ui/settings/defaults/save" hx-target="#panel" hx-swap="innerHTML" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+  <div>
+    <label class="text-sm text-gray-700">SNMP port</label>
+    <input type="number" name="snmp_port" value="{{ st.snmp_port }}" class="mt-1 w-full rounded border px-3 py-2" required>
+  </div>
+
+  <div>
+    <label class="text-sm text-gray-700">Timeout (ms)</label>
+    <input type="number" name="snmp_timeout_ms" value="{{ st.snmp_timeout_ms }}" class="mt-1 w-full rounded border px-3 py-2" required>
+  </div>
+
+  <div>
+    <label class="text-sm text-gray-700">Retries</label>
+    <input type="number" name="snmp_retries" value="{{ st.snmp_retries }}" class="mt-1 w-full rounded border px-3 py-2" required>
+  </div>
+
+  <div>
+    <label class="text-sm text-gray-700">Discovery workers</label>
+    <input type="number" name="discovery_workers" value="{{ st.discovery_workers }}" class="mt-1 w-full rounded border px-3 py-2" required>
+  </div>
+
+  <div>
+    <label class="text-sm text-gray-700">UI scan time limit (s)</label>
+    <input type="number" name="ui_scan_time_limit_s" value="{{ st.ui_scan_time_limit_s }}" class="mt-1 w-full rounded border px-3 py-2" required>
+  </div>
+
+  <div class="md:col-span-2">
+    <button class="rounded bg-purple-600 text-white px-4 py-2 hover:bg-purple-700">Save</button>
+  </div>
+</form>

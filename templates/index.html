@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <!-- Metrics -->
+  <div id="metrics-panel"
+       class="card"
+       hx-get="/ui/panels/metrics"
+       hx-trigger="load, every 5s">
+    <div class="text-sm text-gray-500">Loading metrics…</div>
+  </div>
+
+  <!-- Scan -->
+  <div class="card lg:col-span-2">
+    <div class="flex items-start justify-between gap-3 mb-4">
+      <div>
+        <h2 class="text-lg font-semibold">Run a Scan</h2>
+        <p class="text-sm text-gray-500">Single host or CIDR discovery. Results appear below.</p>
+      </div>
+      <div class="text-xs text-gray-500">
+        Tip: keep logs open for troubleshooting.
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Single host -->
+      <form id="form-host"
+            class="rounded-2xl border bg-white p-4 shadow-sm"
+            hx-post="/ui/scan"
+            hx-target="#scan-result"
+            hx-swap="innerHTML"
+            hx-disabled-elt="#host-submit"
+            hx-indicator="#host-indicator"
+            hx-headers='{"X-API-Key":"{{ api_key|default("") }}"}'>
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-semibold">Single IP / Host</h3>
+          <span id="host-indicator" class="htmx-indicator text-xs text-indigo-700">Scanning…</span>
+        </div>
+
+        <input type="hidden" name="mode" value="host">
+
+        <label class="block text-sm text-gray-600 mb-1">Target</label>
+        <input id="host-target" name="target"
+               class="w-full rounded-xl border px-3 py-2 text-sm"
+               placeholder="e.g. 192.168.1.10" required>
+
+        <div class="mt-3">
+          <label class="block text-sm text-gray-600 mb-1">SNMP</label>
+          <div class="flex gap-2">
+            <select id="host-snmp-version" name="snmp_version" class="rounded-xl border px-2 py-2 text-sm">
+              <option value="2c" selected>v1/v2c (auto)</option>
+              <option value="3">v3</option>
+            </select>
+            <input id="host-community" name="community"
+                   class="rounded-xl border px-2 py-2 text-sm w-full"
+                   value="public" placeholder="community">
+          </div>
+
+          <div id="host-v3" class="grid grid-cols-2 gap-2 mt-2 hidden">
+            <input name="v3_user" class="rounded-xl border px-2 py-2 text-sm" placeholder="v3 user">
+            <input name="v3_auth_key" class="rounded-xl border px-2 py-2 text-sm" placeholder="v3 auth key">
+            <select name="v3_auth_proto" class="rounded-xl border px-2 py-2 text-sm">
+              <option>SHA</option><option>MD5</option><option>NONE</option>
+            </select>
+            <input name="v3_priv_key" class="rounded-xl border px-2 py-2 text-sm" placeholder="v3 priv key">
+            <select name="v3_priv_proto" class="rounded-xl border px-2 py-2 text-sm col-span-2">
+              <option>AES</option><option>DES</option><option>NONE</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <label class="block text-xs text-gray-600">
+            Port
+            <input name="port" class="w-full rounded-xl border px-3 py-2 text-sm" value="161">
+          </label>
+          <label class="block text-xs text-gray-600">
+            Timeout (s)
+            <input name="timeout" class="w-full rounded-xl border px-3 py-2 text-sm" value="2">
+          </label>
+          <label class="block text-xs text-gray-600">
+            Retries
+            <input name="retries" class="w-full rounded-xl border px-3 py-2 text-sm" value="2">
+          </label>
+          <label class="block text-xs text-gray-600">
+            Max ports
+            <input name="max_ports" class="w-full rounded-xl border px-3 py-2 text-sm" value="52">
+          </label>
+          <label class="block text-xs text-gray-600 col-span-2">
+            VLAN ports display
+            <select name="vlan_ports" class="w-full rounded-xl border px-3 py-2 text-sm">
+              <option value="label" selected>VLAN labels</option>
+              <option value="numeric">VLAN numeric</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="mt-4 flex items-center gap-2">
+          <button id="host-submit"
+                  class="px-3 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700">
+            Scan host
+          </button>
+          <button id="stop-host"
+                  type="button"
+                  class="px-3 py-2 rounded-xl bg-rose-600 text-white text-sm font-medium hover:bg-rose-700 hidden">
+            Stop
+          </button>
+        </div>
+      </form>
+
+      <!-- Discovery -->
+      <form id="form-discovery"
+            class="rounded-2xl border bg-white p-4 shadow-sm"
+            hx-post="/ui/scan"
+            hx-target="#scan-result"
+            hx-swap="innerHTML"
+            hx-disabled-elt="#disc-submit"
+            hx-indicator="#disc-indicator"
+            hx-headers='{"X-API-Key":"{{ api_key|default("") }}"}'>
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-semibold">Discover CIDR</h3>
+          <span id="disc-indicator" class="htmx-indicator text-xs text-emerald-700">Scanning…</span>
+        </div>
+
+        <input type="hidden" name="mode" value="discovery">
+
+        <label class="block text-sm text-gray-600 mb-1">CIDR</label>
+        <input id="disc-cidr" name="cidr"
+               class="w-full rounded-xl border px-3 py-2 text-sm"
+               placeholder="e.g. 192.168.1.0/24" required>
+
+        <div class="mt-3">
+          <label class="block text-sm text-gray-600 mb-1">SNMP</label>
+          <div class="flex gap-2">
+            <select id="disc-snmp-version" name="snmp_version" class="rounded-xl border px-2 py-2 text-sm">
+              <option value="2c" selected>v1/v2c (auto)</option>
+              <option value="3">v3</option>
+            </select>
+            <input id="disc-community" name="community"
+                   class="rounded-xl border px-2 py-2 text-sm w-full"
+                   value="public" placeholder="community">
+          </div>
+
+          <div id="disc-v3" class="grid grid-cols-2 gap-2 mt-2 hidden">
+            <input name="v3_user" class="rounded-xl border px-2 py-2 text-sm" placeholder="v3 user">
+            <input name="v3_auth_key" class="rounded-xl border px-2 py-2 text-sm" placeholder="v3 auth key">
+            <select name="v3_auth_proto" class="rounded-xl border px-2 py-2 text-sm">
+              <option>SHA</option><option>MD5</option><option>NONE</option>
+            </select>
+            <input name="v3_priv_key" class="rounded-xl border px-2 py-2 text-sm" placeholder="v3 priv key">
+            <select name="v3_priv_proto" class="rounded-xl border px-2 py-2 text-sm col-span-2">
+              <option>AES</option><option>DES</option><option>NONE</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <label class="block text-xs text-gray-600">
+            Port
+            <input name="port" class="w-full rounded-xl border px-3 py-2 text-sm" value="161">
+          </label>
+          <label class="block text-xs text-gray-600">
+            Timeout (s)
+            <input name="timeout" class="w-full rounded-xl border px-3 py-2 text-sm" value="2">
+          </label>
+          <label class="block text-xs text-gray-600">
+            Retries
+            <input name="retries" class="w-full rounded-xl border px-3 py-2 text-sm" value="1">
+          </label>
+          <label class="block text-xs text-gray-600">
+            Max ports
+            <input name="max_ports" class="w-full rounded-xl border px-3 py-2 text-sm" value="52">
+          </label>
+          <label class="block text-xs text-gray-600 col-span-2">
+            Workers
+            <input name="workers" class="w-full rounded-xl border px-3 py-2 text-sm" value="128">
+          </label>
+        </div>
+
+        <div class="mt-4 flex items-center gap-2">
+          <button id="disc-submit"
+                  class="px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700">
+            Discover
+          </button>
+          <button id="stop-disc"
+                  type="button"
+                  class="px-3 py-2 rounded-xl bg-rose-600 text-white text-sm font-medium hover:bg-rose-700 hidden">
+            Stop
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Result -->
+    <div class="mt-6">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="font-semibold">Result</h3>
+        <span id="result-hint" class="text-xs text-gray-500">Most recent scan output</span>
+      </div>
+      <div id="scan-result"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Logs -->
+<div class="card mt-4">
+  <div class="flex items-center justify-between mb-2">
+    <h3 class="font-semibold">Live scan logs</h3>
+    <div class="flex items-center gap-2">
+      <label class="text-xs text-gray-600 flex items-center gap-2">
+        <input id="logs-live" type="checkbox" class="accent-indigo-600" checked>
+        Live
+      </label>
+      <button id="logs-clear" type="button" class="px-3 py-1.5 rounded bg-gray-900 text-white text-xs">
+        Clear
+      </button>
+    </div>
+  </div>
+
+  <input type="hidden" id="log_offset" value="0">
+
+  <pre id="logbox" class="p-2 text-xs overflow-auto h-64 bg-gray-50 border rounded whitespace-pre-wrap">Waiting for logs…</pre>
+
+  <div id="logs-poller"
+       hx-get="/logs/tail"
+       hx-trigger="load, every 1s"
+       hx-include="#log_offset"
+       hx-swap="none"
+       hx-on::after-request="
+          try{
+            if(!document.getElementById('logs-live').checked) return;
+            const r=JSON.parse(event.detail.xhr.responseText);
+            const box=document.getElementById('logbox');
+            if(r.lines && r.lines.length){
+              box.textContent += (box.textContent ? '\n' : '') + r.lines.join('\n');
+              box.scrollTop = box.scrollHeight;
+            }
+            document.getElementById('log_offset').value = r.next_offset ?? 0;
+          }catch(e){}">
+  </div>
+</div>
+
+<script>
+(function(){
+  // --- v3 toggle (host) ---
+  function toggleV3(selectId, v3Id, communityId){
+    var sel = document.getElementById(selectId);
+    var v3 = document.getElementById(v3Id);
+    var com = document.getElementById(communityId);
+    function apply(){
+      var isV3 = sel.value === "3";
+      v3.classList.toggle("hidden", !isV3);
+      com.parentElement.classList.toggle("hidden", isV3); // hides community input only
+    }
+    sel.addEventListener("change", apply);
+    apply();
+  }
+  toggleV3("host-snmp-version", "host-v3", "host-community");
+  toggleV3("disc-snmp-version", "disc-v3", "disc-community");
+
+  // --- stop buttons (optional: only show if user started a scan) ---
+  var stopHost = document.getElementById("stop-host");
+  var stopDisc = document.getElementById("stop-disc");
+  document.getElementById("form-host").addEventListener("submit", function(){
+    stopHost.classList.remove("hidden");
+    stopDisc.classList.add("hidden");
+  });
+  document.getElementById("form-discovery").addEventListener("submit", function(){
+    stopDisc.classList.remove("hidden");
+    stopHost.classList.add("hidden");
+  });
+
+  // If your stop endpoints work, wire them here:
+  stopHost.addEventListener("click", async function(){
+    var target = document.getElementById("host-target").value.trim();
+    if(!target) return;
+    await fetch(`/scan/stop?kind=host&key=${encodeURIComponent(target)}`, { method:"POST" });
+  });
+  stopDisc.addEventListener("click", async function(){
+    var cidr = document.getElementById("disc-cidr").value.trim();
+    if(!cidr) return;
+    await fetch(`/scan/stop?kind=discover&key=${encodeURIComponent(cidr)}`, { method:"POST" });
+  });
+
+  // --- log controls ---
+  document.getElementById("logs-clear").addEventListener("click", function(){
+    document.getElementById("logbox").textContent = "";
+    document.getElementById("log_offset").value = "0";
+  });
+})();
+</script>
+
+<style>
+/* Make HTMX indicators invisible unless active */
+.htmx-indicator { display: none; }
+.htmx-request .htmx-indicator { display: inline; }
+</style>
+
+{% endblock %}

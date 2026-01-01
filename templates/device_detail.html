@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex items-center justify-between">
+  <h2 class="text-lg font-semibold">Device: {{ ip }}</h2>
+  <a class="px-3 py-1.5 rounded bg-gray-900 text-white"
+     href="/export/device/{{ ip }}.xlsx">Export XLSX</a>
+</div>
+
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button class="px-3 py-1.5 rounded bg-indigo-600 text-white"
+                hx-get="/ui/partials/{{ ip }}/interfaces"
+                hx-target="#tab-content"
+                hx-trigger="click, revealed"
+                hx-swap="innerHTML">
+          Interfaces
+        </button>
+        <button class="px-3 py-1.5 rounded bg-indigo-600 text-white"
+                hx-get="/ui/partials/{{ ip }}/vlans"
+                hx-target="#tab-content"
+                hx-trigger="click"
+                hx-swap="innerHTML">
+          VLANs
+        </button>
+        <button class="px-3 py-1.5 rounded bg-indigo-600 text-white"
+                hx-get="/ui/partials/{{ ip }}/lldp"
+                hx-target="#tab-content"
+                hx-trigger="click"
+                hx-swap="innerHTML">
+          LLDP
+        </button>
+      </div>
+
+      <div id="tab-content" class="mt-4">
+        <div class="text-sm text-gray-500">Choose a tab to load data…</div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

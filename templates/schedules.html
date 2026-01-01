@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Schedules · snmp-magic</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-900">
+<div class="max-w-6xl mx-auto p-6 space-y-6">
+
+  <header class="flex items-center justify-between">
+    <div class="space-y-1">
+      <h1 class="text-2xl font-semibold">Schedule device scans</h1>
+      <p class="text-sm text-slate-500">Choose device(s) from your database and a daily time (Europe/Paris).</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <a href="/" class="px-3 py-1.5 rounded-lg font-medium shadow-sm border border-slate-300 bg-white hover:bg-slate-50">← Dashboard</a>
+      <button id="btn-refresh" class="px-3 py-1.5 rounded-lg font-medium shadow-sm border border-slate-300 bg-white hover:bg-slate-50">Refresh jobs</button>
+    </div>
+  </header>
+
+  <!-- Create schedule -->
+  <section class="bg-white rounded-2xl shadow p-5">
+    <h2 class="text-lg font-semibold mb-4">New daily schedule</h2>
+    <div class="grid lg:grid-cols-3 gap-6">
+      <div>
+        <label class="text-sm font-medium">Devices</label>
+        <div class="flex gap-2 items-center mb-2">
+          <input id="q-dev" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Search by IP or name…">
+          <button id="btn-load" class="px-3 py-1.5 rounded-lg font-medium shadow-sm border border-slate-300 bg-white hover:bg-slate-50">Load</button>
+        </div>
+        <div id="dev-list" class="border rounded-xl max-h-64 overflow-auto p-2 space-y-1 bg-slate-50">
+          <!-- checkboxes appear here -->
+        </div>
+        <p class="text-sm text-slate-500 mt-1">Select one or more devices.</p>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="text-sm font-medium">Time (24h)</label>
+          <input id="daily-time" type="time" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" value="03:00">
+          <p class="text-sm text-slate-500">Runs every day at this time.</p>
+        </div>
+        <div>
+          <label class="text-sm font-medium">Custom Job ID prefix (optional)</label>
+          <input id="job-prefix" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" placeholder="nightly-scan">
+          <p class="text-sm text-slate-500">We’ll suffix the device IP to keep jobs unique.</p>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="text-sm font-medium">SNMP</label>
+          <select id="snmp-version" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="2c" selected>v2c</option>
+            <option value="1">v1</option>
+            <option value="3">v3</option>
+          </select>
+        </div>
+        <div id="v12c" class="space-y-2">
+          <input id="community" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" placeholder="community" value="public">
+        </div>
+        <div id="v3" class="space-y-2 hidden">
+          <input id="v3-user" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" placeholder="v3 user">
+          <input id="v3-auth" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" placeholder="v3 auth key (optional)">
+          <input id="v3-priv" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" placeholder="v3 priv key (optional)">
+          <div class="grid grid-cols-2 gap-2">
+            <select id="v3-authp" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500">
+              <option>SHA</option><option>MD5</option><option>NONE</option>
+            </select>
+            <select id="v3-privp" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500">
+              <option>AES</option><option>DES</option><option>NONE</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <input id="timeout" type="number" min="1" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" value="2" placeholder="timeout (s)">
+          <input id="retries" type="number" min="1" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" value="2" placeholder="retries">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <input id="port" type="number" min="1" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" value="161" placeholder="port">
+          <input id="max-ports" type="number" min="1" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" value="52" placeholder="max ports">
+        </div>
+        <select id="vlan-ports" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="label" selected>VLAN membership: labels</option>
+          <option value="numeric">VLAN membership: numeric</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="mt-4 flex items-center gap-3">
+      <button id="btn-schedule" class="px-3 py-1.5 rounded-lg font-medium shadow-sm bg-blue-600 text-white hover:bg-blue-700">Schedule daily</button>
+      <span id="status" class="text-sm text-slate-500"></span>
+    </div>
+  </section>
+
+  <!-- Jobs -->
+  <section class="bg-white rounded-2xl shadow p-5">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-lg font-semibold">Existing jobs</h2>
+      <input id="q-jobs" class="w-64 px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Filter by ID…">
+    </div>
+    <div class="overflow-x-auto">
+      <table class="min-w-full">
+        <thead>
+          <tr class="text-left text-slate-600 font-medium">
+            <th class="py-2">ID</th><th class="py-2">Trigger</th><th class="py-2">Next run</th><th class="py-2">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="jobs" class="divide-y"></tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  // ---------- helpers ----------
+  async function api(path, method="GET", body=null){
+    const res = await fetch(path, {
+      method,
+      headers: body ? {"Content-Type":"application/json"} : {},
+      body: body ? JSON.stringify(body) : null
+    });
+    if(!res.ok){
+      let t = await res.text().catch(()=>res.statusText);
+      throw new Error(t || (res.status+" "+res.statusText));
+    }
+    return res.json();
+  }
+  const $ = (id)=>document.getElementById(id);
+  const setText = (id, s)=>{ $(id).textContent = s || ""; };
+
+  // ---------- SNMP toggle ----------
+  $("snmp-version").onchange = ()=>{
+    const v = $("snmp-version").value;
+    $("v12c").classList.toggle("hidden", v==="3");
+    $("v3").classList.toggle("hidden", v!=="3");
+  };
+
+  // ---------- devices loader ----------
+  async function loadDevices(){
+    const q = $("q-dev").value.trim();
+    const rows = await api(`/api/devices${q?`?q=${encodeURIComponent(q)}`:""}`);
+    const box = $("dev-list");
+    box.innerHTML = "";
+    if(!rows.length){
+      box.innerHTML = `<div class="text-sm text-slate-500">No devices yet.</div>`;
+      return;
+    }
+    rows.forEach(d=>{
+      const id = `d_${d.ip.replace(/[^\w]/g,"_")}`;
+      const div = document.createElement("label");
+      div.className = "flex items-center gap-2 bg-white rounded-lg px-2 py-1";
+      div.innerHTML = `
+        <input type="checkbox" id="${id}" data-ip="${d.ip}">
+        <div>
+          <div class="font-mono text-xs">${d.ip}</div>
+          <div class="text-sm text-slate-500">${(d.sys_name||"-")}</div>
+        </div>`;
+      box.appendChild(div);
+    });
+  }
+  $("btn-load").onclick = loadDevices;
+  loadDevices(); // initial
+
+  // ---------- jobs list ----------
+  const jobsBody = $("jobs");
+  function renderJobs(rows){
+    const q = $("q-jobs").value.trim().toLowerCase();
+    jobsBody.innerHTML = "";
+    rows.filter(r=>!q || (r.id||"").toLowerCase().includes(q)).forEach(j=>{
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td class="font-mono text-xs pr-4 min-w-[18rem] py-2">${j.id}</td>
+        <td class="pr-4 py-2"><div class="text-sm">${j.trigger}</div></td>
+        <td class="pr-4 py-2"><div class="text-sm">${j.next_run_time || "-"}</div></td>
+        <td class="pr-4 py-2">
+          <div class="flex flex-wrap gap-2">
+            <button data-act="run" data-id="${j.id}" class="px-3 py-1.5 rounded-lg font-medium shadow-sm border border-slate-300 bg-white hover:bg-slate-50">Run now</button>
+            <button data-act="pause" data-id="${j.id}" class="px-3 py-1.5 rounded-lg font-medium shadow-sm bg-amber-500 text-white hover:bg-amber-600">Pause</button>
+            <button data-act="resume" data-id="${j.id}" class="px-3 py-1.5 rounded-lg font-medium shadow-sm bg-emerald-600 text-white hover:bg-emerald-700">Resume</button>
+            <button data-act="del" data-id="${j.id}" class="px-3 py-1.5 rounded-lg font-medium shadow-sm bg-rose-600 text-white hover:bg-rose-700">Delete</button>
+          </div>
+        </td>`;
+      jobsBody.appendChild(tr);
+    });
+  }
+  async function listJobs(){
+    try{
+      const rows = await api("/api/schedules");
+      renderJobs(rows);
+    }catch(e){
+      jobsBody.innerHTML = `<tr><td colspan="4" class="text-rose-600">Failed to load: ${e.message}</td></tr>`;
+    }
+  }
+  $("btn-refresh").onclick = listJobs;
+  $("q-jobs").oninput = listJobs;
+  jobsBody.onclick = async (e)=>{
+    const btn = e.target.closest("button"); if(!btn) return;
+    const id = btn.dataset.id, act = btn.dataset.act;
+    try{
+      if(act==="del") await api(`/api/schedules/${id}`,"DELETE");
+      else await api(`/api/schedules/${id}/${act}`,"POST");
+      listJobs();
+    }catch(err){ alert(err); }
+  };
+  listJobs();
+
+  // ---------- schedule submit ----------
+  $("btn-schedule").onclick = async ()=>{
+    const devices = [...document.querySelectorAll("#dev-list input[type=checkbox]:checked")].map(i=>i.dataset.ip);
+    if(!devices.length){ alert("Pick at least one device"); return; }
+
+    const hhmm = $("daily-time").value || "03:00";
+    const version = $("snmp-version").value;
+    const port = parseInt($("port").value||"161");
+    const timeout = parseInt($("timeout").value||"2");
+    const retries = parseInt($("retries").value||"2");
+    const max_ports = parseInt($("max-ports").value||"52");
+    const vlan_ports = $("vlan-ports").value;
+    const prefix = $("job-prefix").value.trim();
+
+    setText("status","Scheduling…");
+
+    try{
+      for(const ip of devices){
+        const body = {
+          time: hhmm, target: ip, version, port, timeout, retries,
+          max_ports, vlan_ports,
+        };
+        if(version==="3"){
+          body.v3 = {
+            user: $("v3-user").value.trim(),
+            auth_key: $("v3-auth").value.trim() || null,
+            priv_key: $("v3-priv").value.trim() || null,
+            auth_proto: $("v3-authp").value,
+            priv_proto: $("v3-privp").value,
+          };
+        } else {
+          body.community = $("community").value.trim() || "public";
+        }
+        if(prefix) body.job_id = `${prefix}:${ip}`;
+
+        await api("/api/schedules/daily/host","POST",body);
+      }
+      setText("status", `Created/updated ${devices.length} job(s).`);
+      listJobs();
+    }catch(e){
+      setText("status", e.message);
+    }
+  };
+</script>
+</body>
+</html>

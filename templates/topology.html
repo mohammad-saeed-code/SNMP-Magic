@@ -1,0 +1,599 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+  <!-- Graph panel -->
+  <div class="card lg:col-span-3">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-lg font-semibold">LLDP Topology</h2>
+
+      <div class="flex items-center gap-2">
+        <label class="flex items-center gap-1 text-sm">
+          <input id="toggleEndpoints" type="checkbox" class="accent-indigo-600" checked>
+          <span>Show endpoints</span>
+        </label>
+
+        <label class="flex items-center gap-1 text-sm">
+          <input id="toggleLinkLabels" type="checkbox" class="accent-indigo-600">
+          <span>Link labels</span>
+        </label>
+
+        <!-- ✅ Search + focus -->
+        <input
+          id="nodeSearch"
+          type="search"
+          placeholder="Search node…"
+          class="w-56 rounded border px-3 py-1.5 text-sm"
+          autocomplete="off"
+        />
+
+        <button id="refreshBtn" class="px-3 py-1.5 rounded bg-indigo-600 text-white">Refresh</button>
+        <button id="fitBtn" class="px-3 py-1.5 rounded bg-gray-900 text-white">Fit</button>
+      </div>
+    </div>
+
+    <div id="status" class="text-sm text-gray-500 mb-2">Loading topology…</div>
+
+    <div id="graph-wrap" class="w-full h-[560px] rounded border bg-white overflow-hidden relative">
+      <!-- D3 injects SVG here -->
+    </div>
+
+    <div class="text-xs text-gray-500 mt-2">
+      Tip: hover a node to highlight its neighbors. Drag nodes to adjust layout. Scroll to zoom. Click a device node to open it.
+    </div>
+  </div>
+
+  <!-- Details / fallback table -->
+  <div class="card">
+    <h3 class="font-semibold mb-2">Links</h3>
+    <div class="overflow-auto max-h-[560px]">
+      <table class="table w-full text-sm">
+        <thead>
+          <tr class="text-left text-gray-600">
+            <th class="py-1 pr-2">Source</th>
+            <th class="py-1 pr-2">Target</th>
+            <th class="py-1 pr-2">Local IF</th>
+            <th class="py-1">Description</th>
+          </tr>
+        </thead>
+        <tbody id="linksTableBody">
+          <tr><td colspan="4" class="text-sm text-gray-500 py-4 text-center">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- D3.js -->
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script>
+(function() {
+  var statusEl = document.getElementById('status');
+  var wrap = document.getElementById('graph-wrap');
+  var tableBody = document.getElementById('linksTableBody');
+  var refreshBtn = document.getElementById('refreshBtn');
+  var fitBtn = document.getElementById('fitBtn');
+  var chkEndpoints = document.getElementById('toggleEndpoints');
+  var chkLinkLabels = document.getElementById('toggleLinkLabels');
+  var searchEl = document.getElementById('nodeSearch');
+
+  var svg, root, gLinks, gLinkLabels, gNodes, zoom, simulation;
+  var dataNodes = [], dataEdges = [];
+  var neighborMap = new Map(); // id -> Set(neighborIds)
+
+  // ✅ Persist positions across refresh/toggles
+  var posCache = new Map(); // id -> {x,y}
+  var lastFocusedId = null;
+
+  // ✅ Prevent stale fetch overwriting newer results
+  var aborter = null;
+
+  function initSVG() {
+    var w = wrap.clientWidth, h = wrap.clientHeight;
+
+    svg = d3.select('#graph-wrap').append('svg')
+      .attr('width', w).attr('height', h)
+      .attr('viewBox', '0 0 ' + w + ' ' + h)
+      .style('cursor', 'move');
+
+    root = svg.append('g').attr('class', 'root');
+    gLinks = root.append('g').attr('class', 'links');
+    gLinkLabels = root.append('g').attr('class', 'link-labels');
+    gNodes = root.append('g').attr('class', 'nodes');
+
+    zoom = d3.zoom().scaleExtent([0.2, 4]).on('zoom', function(event){
+      root.attr('transform', event.transform);
+    });
+    svg.call(zoom);
+
+    // keep viewBox synced on resize + keep simulation centered
+    var ro = new ResizeObserver(function(entries){
+      var r = entries[0].contentRect;
+      svg.attr('width', r.width).attr('height', r.height).attr('viewBox', '0 0 ' + r.width + ' ' + r.height);
+      if (simulation) simulation.force('center', d3.forceCenter(r.width/2, r.height/2));
+    });
+    ro.observe(wrap);
+  }
+
+  function buildNeighborMap(nodes, edges) {
+    neighborMap.clear();
+    for (var i=0;i<nodes.length;i++){
+      neighborMap.set(nodes[i].id, new Set());
+    }
+    for (var j=0;j<edges.length;j++){
+      var e = edges[j];
+      if (neighborMap.has(e.source)) neighborMap.get(e.source).add(e.target);
+      if (neighborMap.has(e.target)) neighborMap.get(e.target).add(e.source);
+    }
+  }
+
+  function degreeOf(id){
+    var s = neighborMap.get(id);
+    return s ? s.size : 0;
+  }
+
+  function colorNode(d) {
+    return d.type === 'external' ? '#9ca3af' : '#3b82f6'; // endpoints lighter
+  }
+
+  function getFiltered(nodes, edges) {
+    var filteredNodes = nodes.filter(function(n){
+      if (chkEndpoints.checked) return true;
+      return n.type !== 'external';
+    });
+    var keep = new Set(filteredNodes.map(function(n){ return n.id; }));
+    var filteredEdges = edges.filter(function(e){
+      return keep.has(e.source) && keep.has(e.target);
+    });
+    return { nodes: filteredNodes, edges: filteredEdges };
+  }
+
+  function draw(nodes, edges, reason) {
+    var f = getFiltered(nodes, edges);
+    var filteredNodes = f.nodes;
+    var filteredEdges = f.edges;
+
+    buildNeighborMap(filteredNodes, filteredEdges);
+
+    // degree-based radius with safe domain for small graphs
+    var ext = d3.extent(filteredNodes, function(n){ return degreeOf(n.id); });
+    if (ext[0] == null) ext = [0, 1];
+    if (ext[0] === ext[1]) ext[1] = ext[0] + 1;
+
+    var rScale = d3.scaleLinear().domain(ext).range([10, 22]).clamp(true);
+
+    // ✅ apply cached positions
+    for (var i=0; i<filteredNodes.length; i++){
+      var n = filteredNodes[i];
+      var p = posCache.get(n.id);
+      if (p && (typeof n.x !== 'number' || reason === 'data')) {
+        n.x = p.x; n.y = p.y;
+      }
+    }
+
+    // --- LINKS join ---
+    var linkKey = function(d){
+      return (d.source + '→' + d.target + '|' + (d.local_if||'') + '|' + (d.desc||''));
+    };
+
+    var linkSel = gLinks.selectAll('line').data(filteredEdges, linkKey);
+    linkSel.exit().remove();
+
+    var linkEnter = linkSel.enter().append('line')
+      .attr('stroke', '#cbd5e1')
+      .attr('stroke-opacity', 0.6)
+      .attr('stroke-width', 1.5);
+
+    var link = linkEnter.merge(linkSel);
+
+    // --- LINK LABELS join ---
+    var labelSel = gLinkLabels.selectAll('text').data(filteredEdges, linkKey);
+    labelSel.exit().remove();
+
+    var labelEnter = labelSel.enter().append('text')
+      .attr('font-size', 10)
+      .attr('text-anchor', 'middle')
+      .attr('pointer-events', 'none');
+
+    labelEnter.append('tspan')
+      .attr('stroke', 'white')
+      .attr('stroke-width', 3)
+      .attr('paint-order', 'stroke');
+
+    labelEnter.append('tspan')
+      .attr('fill', '#334155');
+
+    var linkLabel = labelEnter.merge(labelSel);
+    linkLabel.select('tspan:nth-child(1)').text(function(d){ return d.local_if || ''; });
+    linkLabel.select('tspan:nth-child(2)').text(function(d){ return d.local_if || ''; });
+
+    // ✅ Toggle labels WITHOUT rebuilding simulation
+    gLinkLabels.style('display', chkLinkLabels.checked ? null : 'none');
+
+    // --- NODES join ---
+    var nodeSel = gNodes.selectAll('g.node').data(filteredNodes, function(d){ return d.id; });
+    nodeSel.exit().remove();
+
+    var nodeEnter = nodeSel.enter().append('g')
+      .attr('class', 'node')
+      .call(d3.drag()
+        .on('start', dragstarted)
+        .on('drag', dragged)
+        .on('end', dragended));
+
+    nodeEnter.append('circle')
+      .attr('stroke', '#0f172a')
+      .attr('stroke-width', 1.0);
+
+    nodeEnter.append('text')
+      .attr('class', 'label-halo')
+      .attr('y', 5)
+      .attr('font-size', '12px')
+      .attr('stroke', 'white')
+      .attr('stroke-width', 3)
+      .attr('paint-order', 'stroke')
+      .attr('fill', 'white');
+
+    nodeEnter.append('text')
+      .attr('class', 'label')
+      .attr('y', 5)
+      .attr('font-size', '12px')
+      .attr('fill', '#1f2937');
+
+    var node = nodeEnter.merge(nodeSel);
+
+    node.select('circle')
+      .attr('r', function(d){ return rScale(degreeOf(d.id)); })
+      .attr('fill', colorNode);
+
+    node.select('text.label-halo')
+      .text(function(d){ return d.label || d.id; })
+      .attr('x', function(d){ return rScale(degreeOf(d.id)) + 8; });
+
+    node.select('text.label')
+      .text(function(d){ return d.label || d.id; })
+      .attr('x', function(d){ return rScale(degreeOf(d.id)) + 8; });
+
+    // interactive highlighting
+    node.on('mouseover', function(_, d){ setHighlight(d.id); })
+        .on('mouseout', function(){ clearHighlight(); })
+        .on('click', function(_, d){
+          if (d.type !== 'external') {
+            window.location.href = '/devices/' + encodeURIComponent(d.id) + '/ui';
+          }
+        });
+
+    // --- SIMULATION (create once, update thereafter) ---
+    if (!simulation) {
+      simulation = d3.forceSimulation(filteredNodes)
+        .force('link', d3.forceLink(filteredEdges).id(function(d){return d.id;})
+          .distance(function(d){
+            var a = (typeof d.source === 'object') ? d.source : {type: ''};
+            var b = (typeof d.target === 'object') ? d.target : {type: ''};
+            return (a.type === 'external' || b.type === 'external') ? 90 : 130;
+          })
+          .strength(0.25)
+        )
+        .force('charge', d3.forceManyBody().strength(-280))
+        .force('center', d3.forceCenter(wrap.clientWidth/2, wrap.clientHeight/2))
+        .force('collide', d3.forceCollide().radius(function(d){
+          return rScale(degreeOf(d.id)) + 10;
+        }).iterations(2));
+
+      simulation.on('tick', function(){
+        link
+          .attr('x1', function(d){return d.source.x;})
+          .attr('y1', function(d){return d.source.y;})
+          .attr('x2', function(d){return d.target.x;})
+          .attr('y2', function(d){return d.target.y;});
+
+        linkLabel
+          .attr('x', function(d){return (d.source.x + d.target.x)/2;})
+          .attr('y', function(d){return (d.source.y + d.target.y)/2 - 6;});
+
+        node.attr('transform', function(d){ return 'translate(' + d.x + ',' + d.y + ')'; });
+
+        // ✅ persist positions continuously
+        for (var k=0; k<filteredNodes.length; k++){
+          var nd = filteredNodes[k];
+          if (typeof nd.x === 'number' && typeof nd.y === 'number') {
+            posCache.set(nd.id, {x: nd.x, y: nd.y});
+          }
+        }
+      });
+    } else {
+      simulation.nodes(filteredNodes);
+      simulation.force('link').links(filteredEdges);
+
+      simulation.force('collide').radius(function(d){
+        return rScale(degreeOf(d.id)) + 10;
+      });
+
+      simulation.alpha(0.6).restart();
+    }
+
+    // Keep focus after redraw
+    if (lastFocusedId) {
+      setHighlight(lastFocusedId);
+      focusNodeById(lastFocusedId, false);
+    }
+
+    function setHighlight(id){
+      lastFocusedId = id;
+      var neigh = neighborMap.get(id) || new Set();
+
+      gNodes.selectAll('g.node').select('circle')
+        .attr('fill', function(n){
+          if (n.id === id || neigh.has(n.id)) return colorNode(n);
+          return '#cbd5e1';
+        })
+        .attr('stroke-width', function(n){ return (n.id === id) ? 2 : 1; });
+
+      gLinks.selectAll('line')
+        .attr('stroke', function(l){
+          return (l.source.id === id || l.target.id === id || neigh.has(l.source.id) || neigh.has(l.target.id))
+            ? '#64748b'
+            : '#e5e7eb';
+        })
+        .attr('stroke-opacity', function(l){
+          return (l.source.id === id || l.target.id === id || neigh.has(l.source.id) || neigh.has(l.target.id)) ? 0.95 : 0.3;
+        })
+        .attr('stroke-width', function(l){
+          return (l.source.id === id || l.target.id === id) ? 3 : 1.5;
+        });
+
+      // show link labels only for connected edges when enabled
+      gLinkLabels.selectAll('text')
+        .style('display', function(l){
+          if (!chkLinkLabels.checked) return 'none';
+          return (l.source.id === id || l.target.id === id) ? null : 'none';
+        });
+    }
+
+    function clearHighlight(){
+      lastFocusedId = null;
+
+      gNodes.selectAll('g.node').select('circle')
+        .attr('fill', colorNode)
+        .attr('stroke-width', 1);
+
+      gLinks.selectAll('line')
+        .attr('stroke', '#cbd5e1')
+        .attr('stroke-opacity', 0.6)
+        .attr('stroke-width', 1.5);
+
+      gLinkLabels.selectAll('text')
+        .style('display', chkLinkLabels.checked ? null : 'none');
+
+      gLinkLabels.style('display', chkLinkLabels.checked ? null : 'none');
+    }
+  }
+
+  function dragstarted(event, d) {
+    if (!event.active) simulation.alphaTarget(0.2).restart();
+    d.fx = d.x; d.fy = d.y;
+  }
+  function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
+  function dragended(event, d) {
+    if (!event.active) simulation.alphaTarget(0);
+    d.fx = null; d.fy = null;
+    if (typeof d.x === 'number' && typeof d.y === 'number') {
+      posCache.set(d.id, {x: d.x, y: d.y});
+    }
+  }
+
+  // ✅ Safe table rendering (no innerHTML)
+  function setTableMessage(msg, isError) {
+    tableBody.innerHTML = '';
+    var tr = document.createElement('tr');
+    var td = document.createElement('td');
+    td.colSpan = 4;
+    td.className = 'text-sm py-4 text-center ' + (isError ? 'text-red-700' : 'text-gray-500');
+    td.textContent = msg;
+    tr.appendChild(td);
+    tableBody.appendChild(tr);
+  }
+
+  function renderTable(edges) {
+    tableBody.innerHTML = '';
+    for (var i=0; i<edges.length; i++) {
+      var e = edges[i];
+      var tr = document.createElement('tr');
+
+      function cell(text, cls) {
+        var td = document.createElement('td');
+        td.className = (cls || '') + ' align-top';
+        td.textContent = text || '';
+        return td;
+      }
+
+      tr.appendChild(cell(e.source, 'py-1 pr-2'));
+      tr.appendChild(cell(e.target, 'py-1 pr-2'));
+      tr.appendChild(cell(e.local_if, 'py-1 pr-2 text-xs'));
+      tr.appendChild(cell(e.desc, 'py-1 text-xs'));
+
+      tableBody.appendChild(tr);
+    }
+  }
+
+  function fetchData() {
+    statusEl.textContent = 'Loading topology…';
+    setTableMessage('Loading…', false);
+
+    if (aborter) aborter.abort();
+    aborter = new AbortController();
+
+    fetch('/topology/lldp', { signal: aborter.signal })
+      .then(function(res){
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(data){
+        var nodes = Array.isArray(data.nodes) ? data.nodes : [];
+        var rawEdges = Array.isArray(data.edges) ? data.edges
+                    : (Array.isArray(data.links) ? data.links : []);
+
+        var edges = rawEdges.map(function(e){
+          var src = (e.source !== undefined ? e.source : e.src);
+          var dst = (e.target !== undefined ? e.target : e.dst);
+          return {
+            source: src && src.id ? src.id : src,
+            target: dst && dst.id ? dst.id : dst,
+            local_if: e.local_if || e.if || e.port || '',
+            desc: e.desc || e.description || ''
+          };
+        });
+
+        statusEl.textContent = nodes.length
+          ? ('Loaded ' + nodes.length + ' node(s), ' + edges.length + ' link(s).')
+          : 'No LLDP data found. Run a scan first.';
+
+        if (!edges.length) {
+          setTableMessage('No LLDP links found.', false);
+        } else {
+          renderTable(edges);
+        }
+
+        dataNodes = nodes;
+        dataEdges = edges;
+
+        draw(nodes, edges, 'data');
+        setTimeout(fit, 80);
+      })
+      .catch(function(err){
+        if (err && err.name === 'AbortError') return;
+        console.error('TOPO load failed:', err);
+        statusEl.textContent = 'Failed to load topology: ' + err;
+        setTableMessage('Failed to load.', true);
+      });
+  }
+
+  // ✅ Fixed fit math (true midpoint centering)
+  function fit() {
+    var nodes = gNodes.selectAll('g.node').data();
+    if (!nodes.length) {
+      svg.transition().duration(300).call(zoom.transform, d3.zoomIdentity);
+      return;
+    }
+
+    var minX = d3.min(nodes, function(d){ return d.x; }) - 80;
+    var maxX = d3.max(nodes, function(d){ return d.x; }) + 80;
+    var minY = d3.min(nodes, function(d){ return d.y; }) - 80;
+    var maxY = d3.max(nodes, function(d){ return d.y; }) + 80;
+
+    var width = wrap.clientWidth, height = wrap.clientHeight;
+    var gw = Math.max(1, maxX - minX), gh = Math.max(1, maxY - minY);
+    var scale = Math.min(4, Math.max(0.2, 0.95 * Math.min(width / gw, height / gh)));
+
+    var cx = (minX + maxX) / 2;
+    var cy = (minY + maxY) / 2;
+
+    var tx = (width / 2) - scale * cx;
+    var ty = (height / 2) - scale * cy;
+
+    var t = d3.zoomIdentity.translate(tx, ty).scale(scale);
+    svg.transition().duration(350).call(zoom.transform, t);
+  }
+
+  // ✅ Search & focus
+  function findNodeId(query) {
+    if (!query) return null;
+    var q = query.trim().toLowerCase();
+    if (!q) return null;
+
+    // exact match by id or label
+    for (var i=0; i<dataNodes.length; i++) {
+      var n = dataNodes[i];
+      var id = (n.id || '').toString();
+      var label = (n.label || '').toString();
+      if (id.toLowerCase() === q || label.toLowerCase() === q) return n.id;
+    }
+
+    // partial match
+    for (var j=0; j<dataNodes.length; j++) {
+      var n2 = dataNodes[j];
+      var id2 = (n2.id || '').toString().toLowerCase();
+      var label2 = (n2.label || '').toString().toLowerCase();
+      if (id2.includes(q) || label2.includes(q)) return n2.id;
+    }
+    return null;
+  }
+
+  function focusNodeById(id, doZoom) {
+    if (!id) return;
+
+    // node must be currently rendered (endpoints might be hidden)
+    var rendered = gNodes.selectAll('g.node').data();
+    var node = null;
+    for (var i=0; i<rendered.length; i++){
+      if (rendered[i].id === id) { node = rendered[i]; break; }
+    }
+    if (!node || typeof node.x !== 'number' || typeof node.y !== 'number') return;
+
+    if (!doZoom) return;
+
+    var width = wrap.clientWidth, height = wrap.clientHeight;
+    var scale = 1.6;
+    var tx = (width / 2) - scale * node.x;
+    var ty = (height / 2) - scale * node.y;
+
+    var t = d3.zoomIdentity.translate(tx, ty).scale(scale);
+    svg.transition().duration(350).call(zoom.transform, t);
+  }
+
+  // wire up controls
+  initSVG();
+  fetchData();
+
+  refreshBtn.addEventListener('click', fetchData);
+  fitBtn.addEventListener('click', fit);
+
+  // endpoints toggle changes graph contents => redraw (with cached positions)
+  chkEndpoints.addEventListener('change', function(){
+    draw(dataNodes, dataEdges, 'toggle');
+    setTimeout(fit, 60);
+  });
+
+  // link labels toggle => no redraw, no sim restart
+  chkLinkLabels.addEventListener('change', function(){
+    gLinkLabels.style('display', chkLinkLabels.checked ? null : 'none');
+  });
+
+  // Search: Enter focuses (highlight + zoom)
+  if (searchEl) {
+    searchEl.addEventListener('keydown', function(e){
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        var id = findNodeId(searchEl.value);
+        if (id) {
+          lastFocusedId = id;
+          // force a redraw highlight by simulating a hover logic (cheap way)
+          // We simply call draw? Not needed; just rely on hover highlight persistence:
+          // Instead, trigger a highlight by temporarily calling fit focus.
+          // The draw() already keeps lastFocusedId after refresh/toggles.
+          focusNodeById(id, true);
+          // Keep highlight by setting lastFocusedId and letting draw() restore when needed.
+          // For immediate highlight, toggle endpoints redraw if node is hidden:
+          // (optional) if endpoints are hidden and the match is an endpoint, it won't show.
+        } else {
+          statusEl.textContent = 'No match for: ' + searchEl.value;
+        }
+      }
+    });
+
+    // Gentle focus while typing (no zoom)
+    var tmr = null;
+    searchEl.addEventListener('input', function(){
+      clearTimeout(tmr);
+      tmr = setTimeout(function(){
+        var id = findNodeId(searchEl.value);
+        if (id) {
+          lastFocusedId = id;
+          // do not zoom while typing
+          focusNodeById(id, false);
+        }
+      }, 250);
+    });
+  }
+})();
+</script>
+{% endblock %}

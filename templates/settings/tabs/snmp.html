@@ -1,0 +1,66 @@
+<h2 class="text-lg font-semibold mb-3">Global SNMP Profiles</h2>
+
+{% if error %}
+  <div class="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">{{ error }}</div>
+{% endif %}
+
+<div class="rounded-lg border p-3 mb-4">
+  <h3 class="font-medium mb-2">Add profile</h3>
+  <form hx-post="/ui/settings/snmp/add" hx-target="#panel" hx-swap="innerHTML" class="grid grid-cols-1 md:grid-cols-2 gap-2">
+    <input name="name" placeholder="Profile name" class="rounded border px-3 py-2" required>
+
+    <select name="version" class="rounded border px-3 py-2">
+      <option value="2c">SNMP v2c</option>
+      <option value="3">SNMP v3</option>
+    </select>
+
+    <input name="community" placeholder="community (v2c)" class="rounded border px-3 py-2">
+
+    <input name="username" placeholder="username (v3)" class="rounded border px-3 py-2">
+    <input name="security_level" placeholder="security_level (v3) e.g. authPriv" class="rounded border px-3 py-2">
+    <input name="auth_protocol" placeholder="auth_protocol (v3) e.g. SHA" class="rounded border px-3 py-2">
+    <input name="auth_password" placeholder="auth_password (v3)" class="rounded border px-3 py-2">
+    <input name="priv_protocol" placeholder="priv_protocol (v3) e.g. AES128" class="rounded border px-3 py-2">
+    <input name="priv_password" placeholder="priv_password (v3)" class="rounded border px-3 py-2">
+    <input name="context_name" placeholder="context_name (optional)" class="rounded border px-3 py-2">
+
+    <label class="inline-flex items-center gap-2 text-sm md:col-span-2">
+      <input type="checkbox" name="is_default"> Make default for scans
+    </label>
+
+    <div class="md:col-span-2">
+      <button class="rounded bg-purple-600 text-white px-4 py-2 hover:bg-purple-700">Create</button>
+    </div>
+  </form>
+</div>
+
+<div class="space-y-2">
+  {% for p in profiles %}
+    <div class="rounded border p-3 flex items-center justify-between gap-3">
+      <div>
+        <div class="font-medium">
+          {{ p.name }}
+          {% if p.is_default %}
+            <span class="ml-2 text-xs px-2 py-0.5 rounded bg-green-100 text-green-800">default</span>
+          {% endif %}
+        </div>
+        <div class="text-xs text-gray-600">v{{ p.version }} • id={{ p.id }}</div>
+      </div>
+
+      <div class="flex gap-2">
+        <button class="rounded border px-3 py-2 hover:bg-gray-50"
+                hx-post="/ui/settings/snmp/{{ p.id }}/make-default"
+                hx-target="#panel" hx-swap="innerHTML">
+          Make default
+        </button>
+
+        <button class="rounded border px-3 py-2 hover:bg-gray-50"
+                hx-delete="/ui/settings/snmp/{{ p.id }}"
+                hx-target="#panel" hx-swap="innerHTML"
+                hx-confirm="Delete SNMP profile '{{ p.name }}'?">
+          Delete
+        </button>
+      </div>
+    </div>
+  {% endfor %}
+</div>

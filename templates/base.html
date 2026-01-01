@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>{% block title %}snmp-magic{% endblock %}</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+
+<style>
+  .card { background: white; border-radius: 0.75rem; box-shadow: 0 10px 20px rgba(0,0,0,.06); padding: 1rem; }
+  .pill { font-size: 0.75rem; padding: .125rem .5rem; border-radius: 999px; }
+  .pill-ok { background: #dcfce7; color: #166534; }
+  .pill-bad { background: #fee2e2; color: #991b1b; }
+  .table { width: 100%; font-size: .9rem; }
+  .table th { text-align: left; font-weight: 600; border-bottom: 1px solid #e5e7eb; padding: .5rem .25rem; }
+  .table td { border-bottom: 1px solid #f3f4f6; padding: .5rem .25rem; vertical-align: top; }
+  .kbd { display: inline-block; border-radius: .375rem; background: #f3f4f6; padding: .1rem .4rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .75rem; color: #374151; }
+
+  /* HTMX top loading bar */
+  #htmx-progress {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0;
+    background: #4f46e5; /* indigo-600 */
+    opacity: 0; transition: width 160ms ease, opacity 220ms ease;
+    z-index: 9999;
+  }
+</style>
+</head>
+
+<body class="bg-gray-50 text-gray-900">
+  <div id="htmx-progress"></div>
+
+  <header class="bg-indigo-600 text-white sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/" class="font-semibold tracking-wide">snmp-magic</a>
+
+      {% set active = active|default('') %}
+      {% macro nav(href, key, label) -%}
+        <a href="{{ href }}"
+           class="text-sm px-2 py-1 rounded hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40
+                  {{ 'bg-white/15 font-semibold' if active==key else '' }}"
+           {% if active==key %}aria-current="page"{% endif %}>
+          {{ label }}
+        </a>
+      {%- endmacro %}
+
+      <nav class="flex items-center gap-1">
+        {{ nav('/', 'dashboard', 'Dashboard') }}
+        {{ nav('/devices/ui', 'devices', 'Devices') }}
+        {{ nav('/topology/ui', 'topology', 'Topology') }}
+        {{ nav('/schedules/ui', 'schedules', 'Scheduled Scans') }}
+        {{ nav('/ui/settings', 'settings', 'Settings') }}
+
+      </nav>
+      <form
+        hx-post="/api/auth/logout"
+        hx-trigger="submit"
+        hx-swap="none"
+        hx-on::after-request="window.location.href='/'"
+      >
+        <button
+          type="submit"
+          class="text-sm px-3 py-1.5 rounded bg-white/10 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/40"
+        >
+          Logout
+        </button>
+      </form>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="max-w-7xl mx-auto px-4 py-6 text-xs text-gray-500">
+    Built with FastAPI · HTMX · Tailwind
+  </footer>
+
+<script>
+(function(){
+  // Global HTMX progress bar
+  var bar = document.getElementById('htmx-progress');
+  var t = null;
+
+  document.body.addEventListener('htmx:beforeRequest', function(){
+    clearTimeout(t);
+    bar.style.opacity = '1';
+    bar.style.width = '30%';
+    t = setTimeout(function(){ bar.style.width = '85%'; }, 120);
+  });
+
+  document.body.addEventListener('htmx:afterRequest', function(){
+    clearTimeout(t);
+    bar.style.width = '100%';
+    t = setTimeout(function(){
+      bar.style.opacity = '0';
+      bar.style.width = '0';
+    }, 200);
+  });
+
+  document.body.addEventListener('htmx:responseError', function(evt){
+    console.error('HTMX response error', evt.detail);
+  });
+})();
+</script>
+</body>
+</html>

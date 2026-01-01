@@ -1,0 +1,8 @@
+{% if message %}
+  <div class="rounded-lg border p-3 text-sm
+    {% if kind=='success' %} bg-green-50 border-green-200 text-green-900
+    {% elif kind=='error' %} bg-red-50 border-red-200 text-red-900
+    {% else %} bg-gray-50 border-gray-200 text-gray-900 {% endif %}">
+    {{ message }}
+  </div>
+{% endif %}

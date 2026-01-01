@@ -1,0 +1,29 @@
+<div class="card border border-indigo-200">
+  <div class="flex items-center justify-between">
+    <h3 class="font-semibold">{{ title }}</h3>
+    {% if error %}
+      <span class="pill pill-bad">Error</span>
+    {% else %}
+      <span class="pill pill-ok">OK</span>
+    {% endif %}
+  </div>
+
+  {% if error %}
+    <p class="text-sm text-red-700 mt-2">{{ error }}</p>
+  {% else %}
+    <ul class="list-disc pl-6 text-sm mt-2 space-y-1">
+      {% for line in lines %}
+        <li>{{ line }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if links %}
+    <div class="mt-3 flex flex-wrap gap-3">
+      {% for l in links %}
+        <a class="px-3 py-1 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-sm"
+           href="{{ l.href }}">{{ l.label }}</a>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

@@ -1,0 +1,47 @@
+<div class="grid grid-cols-1 gap-4">
+  <div class="overflow-auto">
+    <table class="table">
+      <thead>
+        <tr>
+          <th class="w-16">VID</th>
+          <th>Name</th>
+          <th>Untagged</th>
+          <th>Tagged</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in vlans %}
+          <tr class="hover:bg-gray-50">
+            <td>{{ v.vid }}</td>
+            <td>{{ v.name }}</td>
+            <td class="text-xs">
+              {% if v.untagged %}{{ ', '.join(v.untagged) }}{% else %}—{% endif %}
+            </td>
+            <td class="text-xs">
+              {% if v.tagged %}{{ ', '.join(v.tagged) }}{% else %}—{% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" class="text-sm text-gray-500 py-6 text-center">No VLAN data.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if pvid %}
+  <div class="overflow-auto">
+    <h3 class="font-semibold mb-2">PVID Map</h3>
+    <table class="table">
+      <thead><tr><th>ifIndex</th><th>PVID</th></tr></thead>
+      <tbody>
+        {% for ifidx, vid in pvid.items()|list|sort %}
+          <tr class="hover:bg-gray-50">
+            <td>{{ ifidx }}</td>
+            <td>{{ vid }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>

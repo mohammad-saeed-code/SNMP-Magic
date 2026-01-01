@@ -1,0 +1,48 @@
+<div class="flex items-center justify-between mb-2">
+  <h3 class="font-semibold">Endpoints for {{ ip }}</h3>
+  <div class="text-sm text-gray-500">Count: {{ count }}</div>
+</div>
+
+{% if active_ifIndex or active_vlan %}
+<div class="mb-2 space-x-2 text-xs">
+  {% if active_ifIndex %}
+    <span class="badge">ifIndex={{ active_ifIndex }}</span>
+  {% endif %}
+  {% if active_vlan %}
+    <span class="badge">VLAN={{ active_vlan }}</span>
+  {% endif %}
+  <a class="link" hx-get="/ui/devices/{{ ip }}/endpoints?version={{ version }}&community={{ community }}"
+     hx-target="#endpoints-panel" hx-swap="innerHTML">clear</a>
+</div>
+{% endif %}
+
+<div class="mb-2 text-xs space-x-2">
+  <!-- Quick filters -->
+  <a class="link"
+     hx-get="/ui/devices/{{ ip }}/endpoints?vlan=1&version={{ version }}&community={{ community }}"
+     hx-target="#endpoints-panel" hx-swap="innerHTML">VLAN 1</a>
+  <!-- Add more chips as you like -->
+</div>
+
+<table class="table w-full">
+  <thead>
+    <tr>
+      <th>MAC</th>
+      <th>Vendor</th>
+      <th>VLAN</th>
+      <th>ifName</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+    <tr class="hover:bg-gray-50">
+      <td class="font-mono text-xs">{{ r.mac }}</td>
+      <td class="text-xs">{{ r.vendor or 'Unknown' }}</td>
+      <td class="text-xs">{{ r.vlan if r.vlan is not none else '—' }}</td>
+      <td class="text-xs">{{ r.ifName or ('#'+(r.ifIndex|string)) }}</td>
+      <td class="text-xs">{{ r.status }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

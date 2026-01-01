@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Settings — snmp-magic{% endblock %}
+
+{% block content %}
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-semibold">Settings</h1>
+    <div class="text-sm text-white/90">
+      {{ user.username }}
+      {% if user.is_admin %}
+        <span class="pill bg-white/20 text-white ml-2">admin</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div id="flash" class="mb-3"></div>
+
+  <div class="grid grid-cols-12 gap-4">
+    <aside class="col-span-12 md:col-span-3">
+      <div class="card p-2">
+        <button class="w-full text-left px-3 py-2 rounded hover:bg-gray-50"
+                hx-get="/ui/settings/tab/password" hx-target="#panel" hx-swap="innerHTML">
+          Password
+        </button>
+
+        <button class="w-full text-left px-3 py-2 rounded hover:bg-gray-50"
+                hx-get="/ui/settings/tab/test" hx-target="#panel" hx-swap="innerHTML">
+          SNMP Test
+        </button>
+
+        {% if user.is_admin %}
+          <div class="my-2 border-t"></div>
+
+          <button class="w-full text-left px-3 py-2 rounded hover:bg-gray-50"
+                  hx-get="/ui/settings/tab/users" hx-target="#panel" hx-swap="innerHTML">
+            Users
+          </button>
+
+          <button class="w-full text-left px-3 py-2 rounded hover:bg-gray-50"
+                  hx-get="/ui/settings/tab/snmp" hx-target="#panel" hx-swap="innerHTML">
+            SNMP Profiles
+          </button>
+
+          <button class="w-full text-left px-3 py-2 rounded hover:bg-gray-50"
+                  hx-get="/ui/settings/tab/defaults" hx-target="#panel" hx-swap="innerHTML">
+            Scan Defaults
+          </button>
+        {% endif %}
+      </div>
+    </aside>
+
+    <main class="col-span-12 md:col-span-9">
+      <div class="card" id="panel"
+           hx-get="/ui/settings/tab/password"
+           hx-trigger="load"
+           hx-target="#panel"
+           hx-swap="innerHTML"></div>
+    </main>
+  </div>
+{% endblock %}

@@ -1,0 +1,38 @@
+# --- Web / API ---
+fastapi
+uvicorn
+jinja2
+python-multipart
+anyio
+
+# --- Database ---
+sqlmodel
+sqlalchemy
+
+# --- Scheduling ---
+apscheduler
+pytz
+
+# --- Data / Files ---
+pandas
+openpyxl
+aiofiles
+requests
+
+# --- UI / Desktop ---
+pystray
+pillow
+pyperclip
+
+# --- Security / Crypto ---
+pycryptodomex
+
+# --- SNMP (LEGACY SYNC HLAPI – DO NOT UPGRADE) ---
+pysnmp-lextudio==5.0.34
+pyasn1==0.4.8
+
+
+
+# NOTE:
+# SNMP Magic relies on legacy PySNMP sync HLAPI.
+# DO NOT upgrade pysnmp or pyasn1 without refactoring snmpio.py.

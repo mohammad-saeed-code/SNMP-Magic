@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <h2 class="text-lg font-semibold">Devices</h2>
+    <div class="flex items-center gap-3">
+      <a class="text-indigo-600 underline text-sm" href="/export/devices.xlsx">Export all (XLSX)</a>
+      <input
+        id="search"
+        type="search"
+        name="q"
+        value="{{ q or '' }}"
+        placeholder="Search by IP, name or description…"
+        class="w-80 rounded border px-3 py-2 text-sm"
+        hx-get="/ui/partials/device-table"
+        hx-trigger="keyup changed delay:250ms, search"
+        hx-target="#device-table"
+        hx-include="#search"
+      />
+    </div>
+  </div>
+
+  <div
+    id="device-table"
+    hx-get="/ui/partials/device-table"
+    hx-trigger="load"
+    hx-vals='{"q":"{{ q or "" }}"}'>
+    <div class="text-sm text-gray-500">Loading…</div>
+  </div>
+
+  {# ─────────────────────────────────────────────────────────────
+     OPTIONAL device details area (Endpoints tab)
+     This block renders ONLY if 'ip' is present in the template context.
+     You can pass it by linking to this page with ?ip=1.2.3.4 or by
+     rendering with {"ip": "...", "community": "...", "version": "..."}
+     ───────────────────────────────────────────────────────────── #}
+  {% if ip %}
+    <div class="mt-8">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-semibold">
+          Device: <span class="font-mono">{{ ip }}</span>
+        </h3>
+        <div class="text-sm text-gray-500">
+          SNMP: <span class="font-mono">{{ (version or '2c') ~ '/' ~ (community or 'public') }}</span>
+        </div>
+      </div>
+
+      {# Tabs header — add more tabs later (Overview, Interfaces, LLDP, …).
+         For now we only wire the Endpoints tab. #}
+      <ul class="flex gap-2 mt-3 border-b">
+        <li>
+          <a
+            class="inline-block px-3 py-2 text-sm border-b-2 border-transparent hover:border-indigo-300"
+            hx-get="/ui/devices/{{ ip }}/endpoints?community={{ community or 'public' }}&version={{ version or '2c' }}"
+            hx-target="#device-tab-content"
+            hx-swap="innerHTML">
+            Endpoints
+          </a>
+        </li>
+      </ul>
+
+      {# Tab content container — clicking the tab above will load
+         templates/partials/endpoints.html here. #}
+      <div id="device-tab-content" class="mt-4">
+        <div class="text-sm text-gray-500">Select a tab to load details…</div>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

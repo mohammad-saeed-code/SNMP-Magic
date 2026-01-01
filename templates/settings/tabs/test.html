@@ -1,0 +1,44 @@
+<h2 class="text-lg font-semibold mb-3">SNMP Credential Test</h2>
+
+{% if error %}
+  <div class="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">{{ error }}</div>
+{% endif %}
+
+<form hx-post="/ui/settings/test/run" hx-target="#panel" hx-swap="innerHTML" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+  <div class="md:col-span-2">
+    <label class="text-sm text-gray-700">Target IP</label>
+    <input name="target_ip" value="{{ target_ip or '' }}" placeholder="192.168.1.1" class="mt-1 w-full rounded border px-3 py-2" required>
+  </div>
+
+  <div>
+    <label class="text-sm text-gray-700">Use saved profile</label>
+    <select name="profile_id" class="mt-1 w-full rounded border px-3 py-2">
+      <option value="">— select —</option>
+      {% for p in profiles %}
+        <option value="{{ p.id }}">{{ p.name }}{% if p.is_default %} (default){% endif %}</option>
+      {% endfor %}
+    </select>
+    <div class="text-xs text-gray-500 mt-1">If you select a profile, community below is ignored.</div>
+  </div>
+
+  <div>
+    <label class="text-sm text-gray-700">Or test v2c community</label>
+    <input name="community" placeholder="public" class="mt-1 w-full rounded border px-3 py-2">
+  </div>
+
+  <div class="md:col-span-2">
+    <button class="rounded bg-purple-600 text-white px-4 py-2 hover:bg-purple-700">Run test</button>
+  </div>
+</form>
+
+{% if test_result %}
+  <div class="mt-4 rounded-lg border p-3">
+    {% if test_result.success %}
+      <div class="text-green-900 font-medium">Success</div>
+      <div class="text-sm text-gray-700 mt-1">sysName: <span class="font-mono">{{ test_result.sys_name }}</span></div>
+    {% else %}
+      <div class="text-red-900 font-medium">Failed</div>
+      <div class="text-sm text-gray-700 mt-1">Error: <span class="font-mono">{{ test_result.error }}</span></div>
+    {% endif %}
+  </div>
+{% endif %}

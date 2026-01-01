@@ -1,0 +1,119 @@
+{# ---------- helpers (frontend-only) ---------- #}
+{% macro fmt_mac(value) -%}
+  {# If a plain string, show as-is (already formatted?) #}
+  {% if value is string %}
+    {{ value }}
+  {% elif value is iterable %}
+    {# Build hex string from many shapes:
+       - [140,31,100,214,43,89] -> 8c1f64d62b59
+       - ['8','c',',','1','f',... ] -> 8c1f64d62b59 (commas/garbage dropped)
+    #}
+    {% set ns = namespace(parts=[]) %}
+    {% for x in value %}
+      {% if x is number %}
+        {% set ns.parts = ns.parts + ["%02x"|format(x)] %}
+      {% else %}
+        {% set ch = (x|string).lower() %}
+        {% if ch in ['0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'] %}
+          {% set ns.parts = ns.parts + [ch] %}
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+    {% set hex = ns.parts|join('') %}
+    {% if hex|length == 12 %}
+      {{ hex[0:2] ~ ':' ~ hex[2:4] ~ ':' ~ hex[4:6] ~ ':' ~ hex[6:8] ~ ':' ~ hex[8:10] ~ ':' ~ hex[10:12] }}
+    {% else %}
+      {{ hex }}
+    {% endif %}
+  {% else %}
+    {{ value }}
+  {% endif %}
+{%- endmacro %}
+
+{% macro fmt_mac_list(values) -%}
+  {# Accepts:
+     - list of macs (strings/bytes/lists)
+     - single string with commas/semicolons/spaces (e.g., "8c1f..., a2:7a:..., 10:..")
+  #}
+  {% if values is string %}
+    {% set s = values|replace(';',' ')|replace(',', ' ') %}
+    {% set tokens = s.split() %}
+    {% for t in tokens %}
+      {{ fmt_mac(t) }}{% if not loop.last %}, {% endif %}
+    {% endfor %}
+  {% elif values is iterable %}
+    {% set out = namespace(items=[]) %}
+    {% for v in values %}
+      {% set out.items = out.items + [ fmt_mac(v) ] %}
+    {% endfor %}
+    {{ out.items|join(', ') }}
+  {% else %}
+    —
+  {% endif %}
+{%- endmacro %}
+
+<table class="table w-full">
+  <thead>
+    <tr>
+      <th>Idx</th>
+      <th>Name</th>
+      <th>Alias</th>
+      <th>Admin/Oper</th>
+      <th>Speed</th>
+      <th>MTU</th>
+      <th>Duplex</th>
+      <th>VLAN (PVID)</th>
+      <th>In</th>
+      <th>Out</th>
+      <th>Err(in/out)</th>
+      <th>MAC</th>
+      <th>Last Change</th>
+      <th>Neighbors</th>
+      <th class="text-right">Endpoints</th>
+      <th class="text-left">Endpoint MACs</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for r in rows %}
+    <tr class="hover:bg-gray-50">
+      <td class="text-xs text-gray-700">{{ r.ifIndex }}</td>
+      <td>{{ r.name }}</td>
+      <td class="text-gray-600">{{ r.alias or "—" }}</td>
+      <td class="text-xs">
+        <span class="pill {{ 'pill-ok' if r.admin == 'up' else 'pill-bad' }}">{{ r.admin or '—' }}</span>
+        /
+        <span class="pill {{ 'pill-ok' if r.oper == 'up' else 'pill-bad' }}">{{ r.oper or '—' }}</span>
+      </td>
+      <td class="text-xs">{{ r.speed or '—' }}</td>
+      <td class="text-xs">{{ r.mtu or '—' }}</td>
+      <td class="text-xs">{{ r.duplex or '—' }}</td>
+      <td class="text-xs">{{ r.pvid if r.pvid is not none else '—' }}</td>
+      <td class="text-xs">{{ r.in_bytes }}</td>
+      <td class="text-xs">{{ r.out_bytes }}</td>
+      <td class="text-xs">{{ r.in_err }}/{{ r.out_err }}</td>
+
+      <td class="text-xs font-mono">
+        {% if r.mac %}{{ fmt_mac(r.mac) }}{% else %}—{% endif %}
+      </td>
+
+      <td class="text-xs">{{ r.last_change or '—' }}</td>
+
+      <td class="text-xs">
+        {% if r.neighbors is iterable and (r.neighbors is not string) %}
+          {{ r.neighbors|join(', ') if r.neighbors|length > 0 else '—' }}
+        {% else %}
+          {{ r.neighbors or '—' }}
+        {% endif %}
+      </td>
+
+      <td class="text-right">{{ r.endpoint_count if r.endpoint_count is defined else 0 }}</td>
+
+      <td class="text-xs font-mono">
+        {% if r.endpoint_macs %}{{ fmt_mac_list(r.endpoint_macs) }}{% else %}—{% endif %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="16" class="text-sm text-gray-500 py-6 text-center">No interface data.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
