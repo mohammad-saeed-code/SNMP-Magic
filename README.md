@@ -55,15 +55,8 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Run
-
-```bash
-python server.py
-```
-
-Then open [http://localhost:8080](http://localhost:8080) in your browser.
-
 ---
+
 
 ## Windows Executable
 
@@ -85,14 +78,3 @@ See `BUILD_README.md` for full packaging instructions. The resulting executable 
 | v2c | ✅ |
 | v3 (noAuthNoPriv / authNoPriv / authPriv) | ✅ |
 
----
-
-## Screenshots
-
-> *(Add screenshots here)*
-
----
-
-## License
-
-MIT
