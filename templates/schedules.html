@@ -1,256 +1,463 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Schedules · snmp-magic</title>
-<script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-slate-50 text-slate-900">
-<div class="max-w-6xl mx-auto p-6 space-y-6">
+{% extends "base.html" %}
+{% block title %}Schedules · snmp-magic{% endblock %}
 
-  <header class="flex items-center justify-between">
-    <div class="space-y-1">
-      <h1 class="text-2xl font-semibold">Schedule device scans</h1>
-      <p class="text-sm text-slate-500">Choose device(s) from your database and a daily time (Europe/Paris).</p>
-    </div>
-    <div class="flex items-center gap-2">
-      <a href="/" class="px-3 py-1.5 rounded-lg font-medium shadow-sm border border-slate-300 bg-white hover:bg-slate-50">← Dashboard</a>
-      <button id="btn-refresh" class="px-3 py-1.5 rounded-lg font-medium shadow-sm border border-slate-300 bg-white hover:bg-slate-50">Refresh jobs</button>
-    </div>
-  </header>
+{% block content %}
+<style>
+  .sched-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 860px) { .sched-grid { grid-template-columns: 1fr; } }
 
-  <!-- Create schedule -->
-  <section class="bg-white rounded-2xl shadow p-5">
-    <h2 class="text-lg font-semibold mb-4">New daily schedule</h2>
-    <div class="grid lg:grid-cols-3 gap-6">
-      <div>
-        <label class="text-sm font-medium">Devices</label>
-        <div class="flex gap-2 items-center mb-2">
-          <input id="q-dev" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Search by IP or name…">
-          <button id="btn-load" class="px-3 py-1.5 rounded-lg font-medium shadow-sm border border-slate-300 bg-white hover:bg-slate-50">Load</button>
+  /* ── Form panel ── */
+  .form-panel {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .panel-head {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .panel-head-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .sel-count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+  }
+  .panel-body { padding: 16px; }
+  .panel-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .field { margin-bottom: 14px; }
+  .field-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.67rem;
+    font-weight: 500;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 5px;
+    display: block;
+  }
+  .field-hint { font-size: 0.71rem; color: var(--text-dim); margin-top: 3px; }
+
+  /* Device list */
+  #dev-list {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    max-height: calc(100vh - 380px); min-height: 300px;
+    overflow-y: auto;
+    padding: 3px;
+  }
+  .dev-item {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 9px;
+    padding: 7px 9px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 100ms;
+    user-select: none;
+    width: 100%;
+  }
+  .dev-item:hover { background: var(--surface); }
+  .dev-item input[type=checkbox] {
+    accent-color: var(--accent);
+    flex-shrink: 0;
+    cursor: pointer;
+    width: 14px !important;
+    height: 14px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: inline-block !important;
+  }
+  .dev-ip   { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; color: var(--text); line-height: 1.3; }
+  .dev-name { font-size: 0.71rem; color: var(--text-muted); line-height: 1.3; margin-top: 1px; }
+  .dev-cred-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; margin-left: auto;
+  }
+  .cred-saved { background: var(--green); }
+  .cred-none  { background: var(--amber); }
+
+  /* Status */
+  #form-status {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    transition: color .15s;
+  }
+  #form-status.ok    { color: var(--green); }
+  #form-status.error { color: var(--red); }
+  #form-status.info  { color: var(--text-muted); }
+
+  /* ── Jobs panel ── */
+  .jobs-panel {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .jobs-head {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border2);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .jobs-head-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-right: auto;
+  }
+
+  /* Job rows */
+  .job-row {
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--border2);
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 12px;
+    align-items: center;
+    transition: background 100ms;
+  }
+  .job-row:last-child { border-bottom: none; }
+  .job-row:hover { background: var(--surface2); }
+
+  .job-id {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.76rem;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .job-id .hi { color: var(--cyan); }
+  .job-trigger { font-size: 0.7rem; color: var(--text-muted); margin-top: 1px; }
+
+  .job-next {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.71rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    text-align: right;
+  }
+  .job-next .nl {
+    display: block;
+    font-size: 0.61rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 1px;
+  }
+
+  .job-actions { display: flex; gap: 5px; align-items: center; }
+
+  .jbtn {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.67rem;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 120ms;
+  }
+  .jbtn:hover { opacity: .8; }
+  .jbtn-run    { background: var(--accent);    color: #fff; }
+  .jbtn-pause  { background: var(--amber-dim); color: var(--amber); border-color: rgba(210,153,34,.3); }
+  .jbtn-resume { background: var(--green-dim); color: var(--green); border-color: rgba(63,185,80,.3); }
+  .jbtn-del    { background: transparent; color: var(--text-dim); border-color: var(--border2); }
+  .jbtn-del:hover { color: var(--red); border-color: var(--red); background: var(--red-dim); }
+
+  .paused-pill {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: var(--amber-dim);
+    color: var(--amber);
+    border: 1px solid rgba(210,153,34,.3);
+  }
+
+  .confirm-row {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem;
+  }
+  .confirm-row span { color: var(--text-muted); }
+  .c-yes { background: var(--red-dim); color: var(--red); border: 1px solid var(--red); border-radius: 4px; padding: 2px 7px; cursor: pointer; font-size: 0.67rem; }
+  .c-no  { background: transparent; color: var(--text-muted); border: 1px solid var(--border); border-radius: 4px; padding: 2px 7px; cursor: pointer; font-size: 0.67rem; }
+
+  .empty-state {
+    padding: 48px 16px;
+    text-align: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+  }
+</style>
+
+<!-- Page header -->
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+  <div>
+    <h1 style="font-size:1.1rem;font-weight:600;color:var(--text);">Scheduled Scans</h1>
+    <p style="font-size:0.76rem;color:var(--text-muted);margin-top:2px;">
+      Pick devices, set a time — credentials are loaded automatically from each device's saved profile.
+    </p>
+  </div>
+  <button class="btn btn-ghost" onclick="loadJobs()">↺ Refresh</button>
+</div>
+
+<div class="sched-grid">
+
+  <!-- ── Form ── -->
+  <div class="form-panel">
+    <div class="panel-head">
+      <span class="panel-head-title">New Schedule</span>
+      <span class="sel-count" id="sel-count">0 selected</span>
+    </div>
+
+    <div class="panel-body">
+
+      <!-- Device search + list -->
+      <div class="field">
+        <label class="field-label">Devices</label>
+        <input id="q-dev" placeholder="filter by IP or name…"
+               style="margin-bottom:6px;" oninput="loadDevices()">
+        <div id="dev-list">
+          <div style="padding:14px;text-align:center;font-size:0.76rem;color:var(--text-dim);">loading…</div>
         </div>
-        <div id="dev-list" class="border rounded-xl max-h-64 overflow-auto p-2 space-y-1 bg-slate-50">
-          <!-- checkboxes appear here -->
+        <div class="field-hint">
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:4px;vertical-align:middle;"></span>green = credentials saved &nbsp;
+          <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--amber);margin-right:4px;vertical-align:middle;"></span>amber = using default
         </div>
-        <p class="text-sm text-slate-500 mt-1">Select one or more devices.</p>
       </div>
 
-      <div class="space-y-3">
-        <div>
-          <label class="text-sm font-medium">Time (24h)</label>
-          <input id="daily-time" type="time" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" value="03:00">
-          <p class="text-sm text-slate-500">Runs every day at this time.</p>
-        </div>
-        <div>
-          <label class="text-sm font-medium">Custom Job ID prefix (optional)</label>
-          <input id="job-prefix" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" placeholder="nightly-scan">
-          <p class="text-sm text-slate-500">We’ll suffix the device IP to keep jobs unique.</p>
-        </div>
+      <!-- Time -->
+      <div class="field">
+        <label class="field-label">Daily time</label>
+        <input id="daily-time" type="time" value="03:00"
+               style="font-family:'IBM Plex Mono',monospace;width:100%;">
+        <div class="field-hint">Timezone: Europe/Paris</div>
       </div>
 
-      <div class="space-y-3">
-        <div>
-          <label class="text-sm font-medium">SNMP</label>
-          <select id="snmp-version" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="2c" selected>v2c</option>
-            <option value="1">v1</option>
-            <option value="3">v3</option>
-          </select>
-        </div>
-        <div id="v12c" class="space-y-2">
-          <input id="community" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" placeholder="community" value="public">
-        </div>
-        <div id="v3" class="space-y-2 hidden">
-          <input id="v3-user" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" placeholder="v3 user">
-          <input id="v3-auth" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" placeholder="v3 auth key (optional)">
-          <input id="v3-priv" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" placeholder="v3 priv key (optional)">
-          <div class="grid grid-cols-2 gap-2">
-            <select id="v3-authp" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500">
-              <option>SHA</option><option>MD5</option><option>NONE</option>
-            </select>
-            <select id="v3-privp" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500">
-              <option>AES</option><option>DES</option><option>NONE</option>
-            </select>
-          </div>
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <input id="timeout" type="number" min="1" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" value="2" placeholder="timeout (s)">
-          <input id="retries" type="number" min="1" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" value="2" placeholder="retries">
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <input id="port" type="number" min="1" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" value="161" placeholder="port">
-          <input id="max-ports" type="number" min="1" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" value="52" placeholder="max ports">
-        </div>
-        <select id="vlan-ports" class="w-full px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500">
-          <option value="label" selected>VLAN membership: labels</option>
-          <option value="numeric">VLAN membership: numeric</option>
-        </select>
-      </div>
     </div>
 
-    <div class="mt-4 flex items-center gap-3">
-      <button id="btn-schedule" class="px-3 py-1.5 rounded-lg font-medium shadow-sm bg-blue-600 text-white hover:bg-blue-700">Schedule daily</button>
-      <span id="status" class="text-sm text-slate-500"></span>
+    <div class="panel-footer">
+      <button class="btn btn-primary" id="btn-schedule" onclick="submitSchedule()">
+        Schedule
+      </button>
+      <span id="form-status" class="info"></span>
     </div>
-  </section>
+  </div>
 
-  <!-- Jobs -->
-  <section class="bg-white rounded-2xl shadow p-5">
-    <div class="flex items-center justify-between mb-2">
-      <h2 class="text-lg font-semibold">Existing jobs</h2>
-      <input id="q-jobs" class="w-64 px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Filter by ID…">
+  <!-- ── Jobs ── -->
+  <div class="jobs-panel">
+    <div class="jobs-head">
+      <span class="jobs-head-title">Active Jobs</span>
+      <input id="q-jobs" placeholder="filter…" style="width:160px;" oninput="renderJobs()">
     </div>
-    <div class="overflow-x-auto">
-      <table class="min-w-full">
-        <thead>
-          <tr class="text-left text-slate-600 font-medium">
-            <th class="py-2">ID</th><th class="py-2">Trigger</th><th class="py-2">Next run</th><th class="py-2">Actions</th>
-          </tr>
-        </thead>
-        <tbody id="jobs" class="divide-y"></tbody>
-      </table>
+    <div id="jobs-body">
+      <div class="empty-state">no scheduled jobs yet</div>
     </div>
-  </section>
+  </div>
 
 </div>
 
 <script>
-  // ---------- helpers ----------
-  async function api(path, method="GET", body=null){
-    const res = await fetch(path, {
-      method,
-      headers: body ? {"Content-Type":"application/json"} : {},
-      body: body ? JSON.stringify(body) : null
-    });
-    if(!res.ok){
-      let t = await res.text().catch(()=>res.statusText);
-      throw new Error(t || (res.status+" "+res.statusText));
-    }
-    return res.json();
-  }
-  const $ = (id)=>document.getElementById(id);
-  const setText = (id, s)=>{ $(id).textContent = s || ""; };
+let _jobs = [];
 
-  // ---------- SNMP toggle ----------
-  $("snmp-version").onchange = ()=>{
-    const v = $("snmp-version").value;
-    $("v12c").classList.toggle("hidden", v==="3");
-    $("v3").classList.toggle("hidden", v!=="3");
-  };
+// ── api ────────────────────────────────────────────────────────────────────
+async function api(path, method = "GET", body = null) {
+  const r = await fetch(path, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : {},
+    body: body ? JSON.stringify(body) : null,
+    credentials: "include",
+  });
+  if (!r.ok) throw new Error((await r.text().catch(() => "")) || r.statusText);
+  return r.json();
+}
 
-  // ---------- devices loader ----------
-  async function loadDevices(){
-    const q = $("q-dev").value.trim();
-    const rows = await api(`/api/devices${q?`?q=${encodeURIComponent(q)}`:""}`);
-    const box = $("dev-list");
-    box.innerHTML = "";
-    if(!rows.length){
-      box.innerHTML = `<div class="text-sm text-slate-500">No devices yet.</div>`;
+// ── devices ────────────────────────────────────────────────────────────────
+async function loadDevices() {
+  const q   = document.getElementById("q-dev").value.trim();
+  const box = document.getElementById("dev-list");
+  try {
+    const rows = await api(`/api/devices${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+    if (!rows.length) {
+      box.innerHTML = `<div style="padding:14px;text-align:center;font-size:0.76rem;color:var(--text-dim);">no devices found</div>`;
       return;
     }
-    rows.forEach(d=>{
-      const id = `d_${d.ip.replace(/[^\w]/g,"_")}`;
-      const div = document.createElement("label");
-      div.className = "flex items-center gap-2 bg-white rounded-lg px-2 py-1";
-      div.innerHTML = `
-        <input type="checkbox" id="${id}" data-ip="${d.ip}">
-        <div>
-          <div class="font-mono text-xs">${d.ip}</div>
-          <div class="text-sm text-slate-500">${(d.sys_name||"-")}</div>
-        </div>`;
-      box.appendChild(div);
-    });
-  }
-  $("btn-load").onclick = loadDevices;
-  loadDevices(); // initial
-
-  // ---------- jobs list ----------
-  const jobsBody = $("jobs");
-  function renderJobs(rows){
-    const q = $("q-jobs").value.trim().toLowerCase();
-    jobsBody.innerHTML = "";
-    rows.filter(r=>!q || (r.id||"").toLowerCase().includes(q)).forEach(j=>{
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td class="font-mono text-xs pr-4 min-w-[18rem] py-2">${j.id}</td>
-        <td class="pr-4 py-2"><div class="text-sm">${j.trigger}</div></td>
-        <td class="pr-4 py-2"><div class="text-sm">${j.next_run_time || "-"}</div></td>
-        <td class="pr-4 py-2">
-          <div class="flex flex-wrap gap-2">
-            <button data-act="run" data-id="${j.id}" class="px-3 py-1.5 rounded-lg font-medium shadow-sm border border-slate-300 bg-white hover:bg-slate-50">Run now</button>
-            <button data-act="pause" data-id="${j.id}" class="px-3 py-1.5 rounded-lg font-medium shadow-sm bg-amber-500 text-white hover:bg-amber-600">Pause</button>
-            <button data-act="resume" data-id="${j.id}" class="px-3 py-1.5 rounded-lg font-medium shadow-sm bg-emerald-600 text-white hover:bg-emerald-700">Resume</button>
-            <button data-act="del" data-id="${j.id}" class="px-3 py-1.5 rounded-lg font-medium shadow-sm bg-rose-600 text-white hover:bg-rose-700">Delete</button>
+    box.innerHTML = rows.map(d => {
+      const safe     = d.ip.replace(/[^\w]/g, "_");
+      const hasCreds = !!d.has_creds;
+      const dotCls   = hasCreds ? "cred-saved" : "cred-none";
+      const dotTitle = hasCreds ? "credentials saved" : "will use default profile";
+      return `
+        <div class="dev-item" onclick="toggleCheck('d_${safe}')">
+          <input type="checkbox" id="d_${safe}" data-ip="${d.ip}" onclick="event.stopPropagation()" onchange="updateSelCount()">
+          <div style="flex:1;min-width:0;">
+            <div class="dev-ip">${d.ip}</div>
+            <div class="dev-name">${d.sys_name || "—"}</div>
           </div>
-        </td>`;
-      jobsBody.appendChild(tr);
-    });
+          <div class="dev-cred-dot ${dotCls}" title="${dotTitle}"></div>
+        </div>`;
+    }).join("");
+  } catch (e) {
+    box.innerHTML = `<div style="padding:12px;color:var(--red);font-size:0.76rem;">${e.message}</div>`;
   }
-  async function listJobs(){
-    try{
-      const rows = await api("/api/schedules");
-      renderJobs(rows);
-    }catch(e){
-      jobsBody.innerHTML = `<tr><td colspan="4" class="text-rose-600">Failed to load: ${e.message}</td></tr>`;
+}
+
+function toggleCheck(id) {
+  const cb = document.getElementById(id);
+  if (cb) { cb.checked = !cb.checked; updateSelCount(); }
+}
+
+function updateSelCount() {
+  const n = document.querySelectorAll("#dev-list input:checked").length;
+  document.getElementById("sel-count").textContent =
+    `${n} device${n !== 1 ? "s" : ""} selected`;
+}
+
+// ── jobs ───────────────────────────────────────────────────────────────────
+async function loadJobs() {
+  try {
+    _jobs = await api("/api/schedules");
+    renderJobs();
+  } catch (e) {
+    document.getElementById("jobs-body").innerHTML =
+      `<div class="empty-state" style="color:var(--red);">${e.message}</div>`;
+  }
+}
+
+function renderJobs() {
+  const q    = document.getElementById("q-jobs").value.trim().toLowerCase();
+  const body = document.getElementById("jobs-body");
+  const rows = _jobs.filter(j => !q || j.id.toLowerCase().includes(q));
+
+  if (!rows.length) {
+    body.innerHTML = `<div class="empty-state">${q ? "no matching jobs" : "no scheduled jobs yet"}</div>`;
+    return;
+  }
+
+  body.innerHTML = rows.map(j => {
+    const ipMatch = j.id.match(/(\d{1,3}(?:\.\d{1,3}){3})/);
+    const ip      = ipMatch ? ipMatch[1] : null;
+    const label   = ip
+      ? j.id.replace(ip, `<span class="hi">${ip}</span>`)
+      : j.id;
+
+    const nextRun = j.next_run_time
+      ? new Date(j.next_run_time).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+      : "—";
+
+    const pausedBadge = j.paused ? `<span class="paused-pill">paused</span>` : "";
+
+    return `
+      <div class="job-row">
+        <div>
+          <div class="job-id">${label} ${pausedBadge}</div>
+          <div class="job-trigger">${j.trigger || ""}</div>
+        </div>
+        <div class="job-next">
+          <span class="nl">next run</span>${nextRun}
+        </div>
+        <div class="job-actions">
+          <button class="jbtn jbtn-run" onclick="jobAction('${j.id}','run')">▶</button>
+          ${j.paused
+            ? `<button class="jbtn jbtn-resume" onclick="jobAction('${j.id}','resume')">Resume</button>`
+            : `<button class="jbtn jbtn-pause"  onclick="jobAction('${j.id}','pause')">Pause</button>`}
+          <button class="jbtn jbtn-del" onclick="confirmDelete('${j.id}', this)">Delete</button>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+async function jobAction(id, act) {
+  try {
+    await api(`/api/schedules/${encodeURIComponent(id)}/${act}`, "POST");
+    if (act === "run") setStatus("info", `▶ ${id} triggered`);
+    await loadJobs();
+  } catch (e) { setStatus("error", e.message); }
+}
+
+function confirmDelete(id, btn) {
+  const wrap = document.createElement("span");
+  wrap.className = "confirm-row";
+  wrap.innerHTML = `<span>sure?</span>
+    <button class="c-yes" onclick="doDelete('${id}')">Yes</button>
+    <button class="c-no"  onclick="loadJobs()">No</button>`;
+  btn.replaceWith(wrap);
+}
+
+async function doDelete(id) {
+  try {
+    await api(`/api/schedules/${encodeURIComponent(id)}`, "DELETE");
+    await loadJobs();
+  } catch (e) { setStatus("error", e.message); }
+}
+
+// ── submit ─────────────────────────────────────────────────────────────────
+async function submitSchedule() {
+  const devices = [...document.querySelectorAll("#dev-list input:checked")].map(i => i.dataset.ip);
+  if (!devices.length) { setStatus("error", "select at least one device"); return; }
+
+  const time = document.getElementById("daily-time").value || "03:00";
+  document.getElementById("btn-schedule").disabled = true;
+  setStatus("info", `scheduling ${devices.length} job(s)…`);
+
+  let ok = 0, fail = 0;
+  for (const ip of devices) {
+    try {
+      // Just target + time — scheduler loads credentials from DB automatically
+      await api("/api/schedules/daily/host", "POST", { time, target: ip });
+      ok++;
+    } catch (e) {
+      fail++;
+      console.error(ip, e.message);
     }
   }
-  $("btn-refresh").onclick = listJobs;
-  $("q-jobs").oninput = listJobs;
-  jobsBody.onclick = async (e)=>{
-    const btn = e.target.closest("button"); if(!btn) return;
-    const id = btn.dataset.id, act = btn.dataset.act;
-    try{
-      if(act==="del") await api(`/api/schedules/${id}`,"DELETE");
-      else await api(`/api/schedules/${id}/${act}`,"POST");
-      listJobs();
-    }catch(err){ alert(err); }
-  };
-  listJobs();
 
-  // ---------- schedule submit ----------
-  $("btn-schedule").onclick = async ()=>{
-    const devices = [...document.querySelectorAll("#dev-list input[type=checkbox]:checked")].map(i=>i.dataset.ip);
-    if(!devices.length){ alert("Pick at least one device"); return; }
+  document.getElementById("btn-schedule").disabled = false;
+  setStatus(fail === 0 ? "ok" : "error",
+    fail === 0 ? `✓ ${ok} job${ok !== 1 ? "s" : ""} scheduled`
+               : `${ok} ok · ${fail} failed`);
+  await loadJobs();
+}
 
-    const hhmm = $("daily-time").value || "03:00";
-    const version = $("snmp-version").value;
-    const port = parseInt($("port").value||"161");
-    const timeout = parseInt($("timeout").value||"2");
-    const retries = parseInt($("retries").value||"2");
-    const max_ports = parseInt($("max-ports").value||"52");
-    const vlan_ports = $("vlan-ports").value;
-    const prefix = $("job-prefix").value.trim();
+function setStatus(cls, msg) {
+  const el = document.getElementById("form-status");
+  el.className = cls;
+  el.textContent = msg;
+}
 
-    setText("status","Scheduling…");
-
-    try{
-      for(const ip of devices){
-        const body = {
-          time: hhmm, target: ip, version, port, timeout, retries,
-          max_ports, vlan_ports,
-        };
-        if(version==="3"){
-          body.v3 = {
-            user: $("v3-user").value.trim(),
-            auth_key: $("v3-auth").value.trim() || null,
-            priv_key: $("v3-priv").value.trim() || null,
-            auth_proto: $("v3-authp").value,
-            priv_proto: $("v3-privp").value,
-          };
-        } else {
-          body.community = $("community").value.trim() || "public";
-        }
-        if(prefix) body.job_id = `${prefix}:${ip}`;
-
-        await api("/api/schedules/daily/host","POST",body);
-      }
-      setText("status", `Created/updated ${devices.length} job(s).`);
-      listJobs();
-    }catch(e){
-      setText("status", e.message);
-    }
-  };
+// ── boot ───────────────────────────────────────────────────────────────────
+loadDevices();
+loadJobs();
 </script>
-</body>
-</html>
+{% endblock %}

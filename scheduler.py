@@ -52,26 +52,47 @@ def run_discovery_job(params: Optional[Dict[str, Any]] = None):
 
 def run_single_host_job(params: Optional[Dict[str, Any]] = None):
     """
-    params should contain:
-      target, port, timeout, retries, max_ports, vlan_ports,
-      auth (either tuple ('2c','public') or v3 dict)
+    Runs a full single-host scan using credentials saved in the DB.
+    Falls back to global default profile, then ("2c", "public").
+    params only needs: target  (plus optional port/timeout/retries overrides)
     """
+    from snmp_magic.store import load_device_snmp_profile, get_default_global_snmp_profile
+
     params = params or {}
     target = params.get("target")
     if not target:
         raise ValueError("missing params.target")
 
-    port = int(params.get("port", 161))
-    timeout = int(params.get("timeout", 2))
-    retries = int(params.get("retries", 2))
+    port      = int(params.get("port",      161))
+    timeout   = int(params.get("timeout",   2))
+    retries   = int(params.get("retries",   2))
     max_ports = int(params.get("max_ports", 52))
     vlan_ports = params.get("vlan_ports", "label")
 
-    auth = params.get("auth")
-    if not auth:
-        version = params.get("version", "2c")
-        community = params.get("community", "public")
-        auth = (version, community)
+    # 1. Try saved per-device credentials
+    profile = load_device_snmp_profile(target)
+
+    # 2. Fall back to the global default profile
+    if not profile:
+        profile = get_default_global_snmp_profile()
+
+    # 3. Build auth tuple/dict from profile
+    if profile:
+        ver = profile.get("version", "2c")
+        if ver == "3":
+            auth = {
+                "user":       profile.get("username", ""),
+                "auth_key":   profile.get("auth_password"),
+                "priv_key":   profile.get("priv_password"),
+                "auth_proto": profile.get("auth_protocol", "SHA"),
+                "priv_proto": profile.get("priv_protocol", "AES"),
+            }
+        else:
+            auth = (ver, profile.get("community", "public"))
+    else:
+        # Last resort — anonymous read
+        log.warning("[SCHED] No saved credentials for %s, using public community", target)
+        auth = ("2c", "public")
 
     # quick transport warmup (optional)
     transport(target, port, timeout, retries)

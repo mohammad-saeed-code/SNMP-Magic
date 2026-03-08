@@ -1,212 +1,286 @@
-{% set next_order = 'asc' if order == 'desc' else 'desc' %}
+{# Partial: device table rows — included by devices.html and htmx swaps #}
 
-<style>
-  /* Ticket notches */
-  .ticket {
-    position: relative;
-    overflow: hidden;
-  }
-  .ticket::before,
-  .ticket::after {
-    content: "";
-    position: absolute;
-    top: 54px;
-    width: 18px;
-    height: 18px;
-    border-radius: 999px;
-    background: rgb(249 250 251);
-    border: 1px solid rgb(229 231 235);
-    z-index: 5;
-  }
-  .ticket::before { left: -9px; }
-  .ticket::after  { right: -9px; }
+{% set ICONS = {
+  "router":        "🌐",
+  "switch":        "🔀",
+  "firewall":      "🛡️",
+  "wireless_ap":   "📡",
+  "load_balancer": "⚖️",
+  "linux_server":  "🐧",
+  "windows_server":"🪟",
+  "windows":       "🖥️",
+  "macos":         "🍎",
+  "vmware":        "☁️",
+  "hypervisor":    "☁️",
+  "nas":           "💾",
+  "printer":       "🖨️",
+  "ups":           "🔋",
+  "camera":        "📷",
+  "voip":          "📞",
+  "raspberry_pi":  "🍓",
+  "iot":           "📟",
+  "server":        "🖥️",
+  "unknown":       "❓",
+} %}
 
-  /* HTMX indicator default hidden */
-  .htmx-indicator { display: none; }
-  .htmx-request .htmx-indicator { display: inline-flex; }
-  .htmx-request.htmx-indicator { display: inline-flex; }
-</style>
+{% set TYPE_LABELS = {
+  "router":        "Router",
+  "switch":        "Switch",
+  "firewall":      "Firewall",
+  "wireless_ap":   "AP",
+  "load_balancer": "Load Balancer",
+  "linux_server":  "Linux",
+  "windows_server":"Windows Server",
+  "windows":       "Windows",
+  "macos":         "macOS",
+  "vmware":        "VMware",
+  "hypervisor":    "Hypervisor",
+  "nas":           "NAS",
+  "printer":       "Printer",
+  "ups":           "UPS",
+  "camera":        "Camera",
+  "voip":          "VoIP",
+  "raspberry_pi":  "Raspberry Pi",
+  "iot":           "IoT",
+  "server":        "Server",
+  "unknown":       "",
+} %}
 
-<!-- Sort + results header -->
-<div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-  <div class="text-sm text-gray-600">
-    {% if rows|length %}
-      Showing <span class="font-semibold">{{ rows|length }}</span> device{{ '' if rows|length==1 else 's' }}
-    {% else %}
-      No devices found
-    {% endif %}
-  </div>
+<table class="table">
+  <thead>
+    <tr>
+      <th style="width:32px;"></th>
+      <th>
+        <a hx-get="/ui/partials/device-table?sort_by=ip&order={{ 'asc' if (sort_by=='ip' and order=='desc') else 'desc' }}&q={{ q }}"
+           hx-target="#device-table-wrap" hx-swap="innerHTML"
+           style="cursor:pointer;color:inherit;text-decoration:none;">
+          IP {{ '↑' if sort_by=='ip' and order=='asc' else ('↓' if sort_by=='ip' else '') }}
+        </a>
+      </th>
+      <th>Type</th>
+      <th>
+        <a hx-get="/ui/partials/device-table?sort_by=sys_name&order={{ 'asc' if (sort_by=='sys_name' and order=='desc') else 'desc' }}&q={{ q }}"
+           hx-target="#device-table-wrap" hx-swap="innerHTML"
+           style="cursor:pointer;color:inherit;text-decoration:none;">
+          Name {{ '↑' if sort_by=='sys_name' and order=='asc' else ('↓' if sort_by=='sys_name' else '') }}
+        </a>
+      </th>
+      <th>Description</th>
+      <th>
+        <a hx-get="/ui/partials/device-table?sort_by=last_seen&order={{ 'asc' if (sort_by=='last_seen' and order=='desc') else 'desc' }}&q={{ q }}"
+           hx-target="#device-table-wrap" hx-swap="innerHTML"
+           style="cursor:pointer;color:inherit;text-decoration:none;">
+          Last Seen {{ '↑' if sort_by=='last_seen' and order=='asc' else ('↓' if sort_by=='last_seen' else '') }}
+        </a>
+      </th>
+      <th style="width:200px;"></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for d in rows %}
+    {% set dtype  = d.device_type or 'unknown' %}
+    {% set icon   = ICONS.get(dtype, '❓') %}
+    {% set tlabel = TYPE_LABELS.get(dtype, '') %}
+    <tr id="row-{{ d.ip | replace('.', '-') }}">
 
-  <div class="flex items-center gap-2 text-sm">
-    <span class="text-gray-500">Sort:</span>
+      {# Icon #}
+      <td style="text-align:center;font-size:1.15rem;" title="{{ tlabel }}">{{ icon }}</td>
 
-    <a class="px-2 py-1 rounded border bg-white hover:bg-gray-50"
-       hx-get="/ui/partials/device-table?q={{ q }}&sort_by=ip&order={{ 'desc' if sort_by!='ip' else next_order }}"
-       hx-target="#device-table" hx-swap="innerHTML">
-      IP {% if sort_by == 'ip' %}<span class="text-xs">{{ '▲' if order == 'asc' else '▼' }}</span>{% endif %}
-    </a>
+      {# IP #}
+      <td>
+        <a href="/devices/{{ d.ip }}/ui"
+           style="font-family:'IBM Plex Mono',monospace;font-size:0.82rem;
+                  color:var(--cyan);text-decoration:none;">
+          {{ d.ip }}
+        </a>
+      </td>
 
-    <a class="px-2 py-1 rounded border bg-white hover:bg-gray-50"
-       hx-get="/ui/partials/device-table?q={{ q }}&sort_by=sys_name&order={{ 'desc' if sort_by!='sys_name' else next_order }}"
-       hx-target="#device-table" hx-swap="innerHTML">
-      Name {% if sort_by == 'sys_name' %}<span class="text-xs">{{ '▲' if order == 'asc' else '▼' }}</span>{% endif %}
-    </a>
-
-    <a class="px-2 py-1 rounded border bg-white hover:bg-gray-50"
-       hx-get="/ui/partials/device-table?q={{ q }}&sort_by=last_seen&order={{ 'desc' if sort_by!='last_seen' else next_order }}"
-       hx-target="#device-table" hx-swap="innerHTML">
-      Last seen {% if sort_by == 'last_seen' %}<span class="text-xs">{{ '▲' if order == 'asc' else '▼' }}</span>{% endif %}
-    </a>
-  </div>
-</div>
-
-{% if rows|length == 0 %}
-  <div class="rounded-2xl border bg-white p-8 text-center text-sm text-gray-500">
-    No devices found.
-  </div>
-{% else %}
-
-<!-- Ticket cards grid -->
-<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-  {% for d in rows %}
-  {% set did = d.ip|replace('.', '-') %}
-
-  <div class="ticket rounded-2xl border bg-white shadow-sm hover:shadow-md transition">
-    <!-- Top strip -->
-    <div class="h-1.5 bg-gradient-to-r from-indigo-500 via-sky-500 to-emerald-500"></div>
-
-    <!-- Header -->
-    <div class="p-4 pb-3">
-      <div class="flex items-start justify-between gap-3">
-        <div class="min-w-0">
-          <a class="font-mono text-sm font-semibold text-indigo-700 hover:underline"
-             href="/devices/{{ d.ip }}/ui">
-            {{ d.ip }}
-          </a>
-          <div class="mt-1 text-sm font-medium text-gray-900 truncate">
-            {{ d.sys_name or '—' }}
-          </div>
-        </div>
-
-        {% if d.last_seen %}
-          <span class="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-2 py-0.5 text-xs font-medium">
-            Seen
-          </span>
-        {% else %}
-          <span class="inline-flex items-center rounded-full bg-slate-100 text-slate-700 px-2 py-0.5 text-xs font-medium">
-            New
-          </span>
+      {# Type badge #}
+      <td>
+        {% if tlabel %}
+        <span class="pill" style="font-size:0.65rem;background:var(--surface2);
+                                  color:var(--text-muted);border-color:var(--border2);">
+          {{ tlabel }}
+        </span>
         {% endif %}
-      </div>
+      </td>
 
-      <!-- Chips row -->
-      <div class="mt-3 flex flex-wrap gap-1.5">
-        {% if d.snmp_version %}
-          <span class="inline-flex items-center rounded-full bg-indigo-50 text-indigo-700 px-2 py-0.5 text-[11px] font-medium">
-            SNMP {{ d.snmp_version }}
-          </span>
-        {% endif %}
+      {# Name #}
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:0.82rem;">
+        {{ d.sys_name or "—" }}
+      </td>
 
-        {% if d.vendor %}
-          <span class="inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2 py-0.5 text-[11px] font-medium">
-            {{ d.vendor }}
-          </span>
-        {% endif %}
+      {# Description #}
+      <td style="max-width:260px;">
+        <span style="font-size:0.76rem;color:var(--text-muted);
+                     display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+              title="{{ d.sys_descr or '' }}">
+          {{ (d.sys_descr or "—")[:80] }}
+        </span>
+      </td>
 
-        {% if d.model %}
-          <span class="inline-flex items-center rounded-full bg-gray-100 text-gray-700 px-2 py-0.5 text-[11px] font-medium">
-            {{ d.model }}
-          </span>
-        {% endif %}
+      {# Last seen #}
+      <td style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;
+                 color:var(--text-muted);white-space:nowrap;">
+        {{ d.last_seen.strftime('%Y-%m-%d %H:%M') if d.last_seen else '—' }}
+      </td>
 
-        {% if not d.snmp_version and not d.vendor and not d.model %}
-          <span class="inline-flex items-center rounded-full bg-gray-50 text-gray-500 px-2 py-0.5 text-[11px]">
-            metadata —
-          </span>
-        {% endif %}
-      </div>
-    </div>
+      {# Actions — all plain JS fetch, no htmx dependency #}
+      <td>
+        <div style="display:flex;gap:5px;align-items:center;">
 
-    <!-- Perforation line -->
-    <div class="px-4">
-      <div class="border-t border-dashed border-gray-200"></div>
-    </div>
-
-    <!-- Body -->
-    <div class="p-4 pt-3">
-      <div class="text-xs text-gray-600 line-clamp-3 min-h-[3.75rem]">
-        {{ d.sys_descr or '—' }}
-      </div>
-
-      <!-- Notes (lazy-loaded so it persists after refresh) -->
-      <div class="mt-3"
-           hx-get="/api/devices/{{ d.ip }}/note?as=html"
-           hx-trigger="load"
-           hx-target="this"
-           hx-swap="outerHTML">
-        <div class="text-[11px] text-gray-400">Loading note…</div>
-      </div>
-
-      <div class="mt-4 flex items-center justify-between gap-2">
-        <div class="text-xs text-gray-500">
-          Last seen:
-          {% if d.last_seen %}
-            <time class="font-mono" datetime="{{ d.last_seen }}">
-              {% if d.last_seen.strftime is defined %}
-                {{ d.last_seen.strftime("%Y-%m-%d %H:%M") }}
-              {% else %}
-                {{ d.last_seen }}
-              {% endif %}
-            </time>
-          {% else %}
-            —
-          {% endif %}
-        </div>
-
-        <div class="flex items-center gap-2">
-          <!-- Rescan (reuse existing /ui/scan) -->
-          <form class="inline"
-                hx-post="/ui/scan"
-                hx-target="#rescan-status-{{ did }}"
-                hx-swap="innerHTML"
-                hx-indicator="#rescan-indicator-{{ did }}">
-            <input type="hidden" name="mode" value="host">
-            <input type="hidden" name="target" value="{{ d.ip }}">
-            <input type="hidden" name="snmp_version" value="2c">
-            <input type="hidden" name="community" value="public">
-            <input type="hidden" name="port" value="161">
-            <input type="hidden" name="timeout" value="2">
-            <input type="hidden" name="retries" value="2">
-
-            <button class="px-2 py-1 rounded bg-sky-600 text-white text-xs hover:bg-sky-700">
-              Rescan
-            </button>
-
-            <span id="rescan-indicator-{{ did }}" class="htmx-indicator text-xs text-gray-500">
-              Scanning…
-            </span>
-          </form>
-
-          <a class="px-2 py-1 rounded bg-gray-900 text-white text-xs hover:bg-black"
-             href="/devices/{{ d.ip }}/ui">
-            Open
+          {# View #}
+          <a href="/devices/{{ d.ip }}/ui"
+             class="btn btn-ghost"
+             style="padding:3px 8px;font-size:0.72rem;">
+            View
           </a>
 
+          {# Rescan #}
           <button
-            class="px-2 py-1 rounded bg-rose-600 text-white text-xs hover:bg-rose-700"
-            hx-delete="/api/devices/{{ d.ip }}?q={{ q }}&sort_by={{ sort_by }}&order={{ order }}"
-            hx-confirm="Delete device {{ d.sys_name or d.ip }}?"
-            hx-target="#device-table"
-            hx-swap="innerHTML">
-            Delete
+            class="btn btn-ghost"
+            style="padding:3px 8px;font-size:0.72rem;"
+            onclick="rescanDevice('{{ d.ip }}', this)">
+            ↺ Scan
           </button>
+
+          {# Delete #}
+          <button
+            class="btn btn-ghost"
+            style="padding:3px 8px;font-size:0.72rem;color:var(--red);"
+            onclick="deleteDevice('{{ d.ip }}', this)">
+            ✕
+          </button>
+
         </div>
-      </div>
+      </td>
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="7"
+          style="text-align:center;padding:40px;color:var(--text-dim);
+                 font-family:'IBM Plex Mono',monospace;font-size:0.8rem;">
+        no devices found
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
 
-      <div id="rescan-status-{{ did }}" class="mt-2 text-xs text-gray-500"></div>
-    </div>
-  </div>
-  {% endfor %}
-</div>
+<script>
+// ── Delete device ─────────────────────────────────────────────────────────
+async function deleteDevice(ip, btn) {
+  if (!confirm('Delete ' + ip + '?')) return;
 
-{% endif %}
+  btn.disabled = true;
+  btn.textContent = '…';
+
+  try {
+    const r = await fetch('/api/devices/' + ip, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+
+    if (r.ok) {
+      // Remove the row immediately
+      const row = document.getElementById('row-' + ip.replace(/\./g, '-'));
+      if (row) row.remove();
+
+      // Then refresh the whole table from the server
+      const html = await r.text();
+      const wrap = document.getElementById('device-table-wrap');
+      if (wrap) wrap.innerHTML = html;
+    } else {
+      alert('Delete failed: ' + r.status + ' ' + r.statusText);
+      btn.disabled = false;
+      btn.textContent = '✕';
+    }
+  } catch (e) {
+    alert('Delete error: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = '✕';
+  }
+}
+
+// ── Rescan device ─────────────────────────────────────────────────────────
+async function rescanDevice(ip, btn) {
+  btn.disabled = true;
+  btn.textContent = '…';
+
+  const body = new FormData();
+  body.append('mode',         'host');
+  body.append('target',       ip);
+  body.append('snmp_version', '2c');
+  body.append('community',    'public');
+  body.append('port',         '161');
+  body.append('timeout',      '2');
+  body.append('retries',      '2');
+
+  try {
+    const r = await fetch('/ui/scan', {
+      method: 'POST',
+      body,
+      credentials: 'include',
+    });
+
+    const html = await r.text();
+
+    // Try to put result into scan-result-panel if it exists,
+    // otherwise show in a small floating toast
+    const panel = document.getElementById('scan-result-panel');
+    if (panel) {
+      panel.innerHTML = html;
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else {
+      // Fallback: open result in a modal overlay
+      showScanResult(html, ip);
+    }
+  } catch (e) {
+    alert('Scan error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '↺ Scan';
+  }
+}
+
+// ── Scan result overlay (fallback if no #scan-result-panel on page) ───────
+function showScanResult(html, ip) {
+  let overlay = document.getElementById('_scan-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = '_scan-overlay';
+    overlay.style.cssText = `
+      position:fixed;top:0;left:0;right:0;bottom:0;
+      background:rgba(0,0,0,.6);z-index:9999;
+      display:flex;align-items:center;justify-content:center;`;
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+    const box = document.createElement('div');
+    box.style.cssText = `
+      background:var(--surface);border:1px solid var(--border);
+      border-radius:10px;padding:20px;max-width:700px;width:90%;
+      max-height:80vh;overflow-y:auto;position:relative;`;
+
+    const close = document.createElement('button');
+    close.textContent = '✕';
+    close.style.cssText = `
+      position:absolute;top:12px;right:12px;
+      background:transparent;border:none;color:var(--text-muted);
+      cursor:pointer;font-size:1rem;`;
+    close.onclick = () => overlay.remove();
+
+    box.appendChild(close);
+    box.innerHTML += `<div style="font-family:'IBM Plex Mono',monospace;font-size:0.72rem;
+                                  color:var(--text-muted);margin-bottom:12px;">
+                        Scan result: ${ip}</div>`;
+
+    const content = document.createElement('div');
+    content.innerHTML = html;
+    box.appendChild(content);
+    overlay.appendChild(box);
+  } else {
+    overlay.querySelector('div > div:last-child').innerHTML = html;
+  }
+  document.body.appendChild(overlay);
+}
+</script>

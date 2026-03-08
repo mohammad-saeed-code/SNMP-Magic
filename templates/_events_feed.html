@@ -1,0 +1,82 @@
+{#
+  Events feed widget — embed anywhere with:
+    {% include "_events_feed.html" %}
+  or load via htmx:
+    <div hx-get="/ui/partials/events-feed" hx-trigger="load, every 60s"></div>
+#}
+
+<div class="card" style="padding:0;overflow:hidden;">
+  <div style="
+    padding:12px 16px;
+    border-bottom:1px solid var(--border2);
+    display:flex;align-items:center;justify-content:space-between;
+  ">
+    <span class="card-title" style="margin:0;">Recent Changes</span>
+    <a href="/events/ui" style="font-size:0.72rem;color:var(--accent);text-decoration:none;">
+      view all →
+    </a>
+  </div>
+
+  {% if events %}
+  <div style="max-height:420px;overflow-y:auto;">
+    {% for ev in events %}
+    {% set sev_color = {
+      'warn': 'var(--amber)',
+      'ok':   'var(--green)',
+      'info': 'var(--text-muted)',
+    }.get(ev.severity, 'var(--text-muted)') %}
+
+    <div style="
+      display:grid;
+      grid-template-columns:28px 1fr auto;
+      gap:8px;align-items:center;
+      padding:9px 16px;
+      border-bottom:1px solid var(--border2);
+      transition:background 100ms;
+    " onmouseover="this.style.background='var(--surface2)'"
+       onmouseout="this.style.background=''">
+
+      {# Icon #}
+      <span style="font-size:1rem;text-align:center;">{{ ev.icon }}</span>
+
+      {# Content #}
+      <div>
+        <div style="font-size:0.8rem;color:{{ sev_color }};">{{ ev.text }}</div>
+        <div style="font-size:0.71rem;color:var(--text-dim);margin-top:1px;">
+          <a href="/devices/{{ ev.device_ip }}"
+             style="font-family:'IBM Plex Mono',monospace;color:var(--cyan);text-decoration:none;">
+            {{ ev.device_ip }}
+          </a>
+          {% if ev.device_name %}
+            <span style="color:var(--text-dim);"> · {{ ev.device_name }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      {# Timestamp #}
+      <div style="
+        font-family:'IBM Plex Mono',monospace;
+        font-size:0.68rem;
+        color:var(--text-dim);
+        white-space:nowrap;
+        text-align:right;
+      ">{{ ev.ts_human }}</div>
+
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div style="
+    padding:40px 16px;
+    text-align:center;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:0.78rem;
+    color:var(--text-dim);
+  ">
+    no changes detected yet<br>
+    <span style="font-size:0.68rem;margin-top:4px;display:block;">
+      changes appear here after devices are scanned
+    </span>
+  </div>
+  {% endif %}
+</div>

@@ -54,6 +54,7 @@ from fastapi import FastAPI
 from scan_api import router as scan_router
 from schedule_api import router as schedule_router
 from snmp_magic.routes_settings import router as settings_router
+from map_api import router as map_router
 
 app = FastAPI()
 app = FastAPI(title="snmp-magic API")
@@ -63,6 +64,7 @@ app.include_router(schedule_router)
 app.include_router(auth_router)
 app.include_router(settings_router)
 app.include_router(device_notes_router)
+app.include_router(map_router)
 
 
 AUTH_COOKIE = os.getenv("AUTH_COOKIE", "snmp_magic_token")
@@ -533,7 +535,7 @@ def scan_host(req: ScanHostReq):
 
 
 # Stop/cancel scans
-@app.post("/scan/stop", dependencies=[Depends(require_user), Depends(require_api_key)])
+@app.post("/scan/stop", dependencies=[Depends(require_user)])
 def scan_stop(
     kind: str = Query(..., pattern="^(host|discover)$"),
     key: str = Query("", description="For host: target IP. For discover: CIDR."),
@@ -899,7 +901,7 @@ def ui_device_detail(req: Request, ip: str):
 
     return templates.TemplateResponse(
         "device_detail.html",
-        {"request": req, "ip": ip},
+        {"request": req, "ip": ip, "api_key": API_KEY},
     )
 
 

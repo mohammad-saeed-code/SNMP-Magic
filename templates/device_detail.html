@@ -1,38 +1,1132 @@
 {% extends "base.html" %}
+{% block title %}Device {{ ip }} — snmp-magic{% endblock %}
 {% block content %}
-<div class="flex items-center justify-between">
-  <h2 class="text-lg font-semibold">Device: {{ ip }}</h2>
-  <a class="px-3 py-1.5 rounded bg-gray-900 text-white"
-     href="/export/device/{{ ip }}.xlsx">Export XLSX</a>
-</div>
 
-      <div class="mt-3 flex flex-wrap gap-2">
-        <button class="px-3 py-1.5 rounded bg-indigo-600 text-white"
-                hx-get="/ui/partials/{{ ip }}/interfaces"
-                hx-target="#tab-content"
-                hx-trigger="click, revealed"
-                hx-swap="innerHTML">
-          Interfaces
-        </button>
-        <button class="px-3 py-1.5 rounded bg-indigo-600 text-white"
-                hx-get="/ui/partials/{{ ip }}/vlans"
-                hx-target="#tab-content"
-                hx-trigger="click"
-                hx-swap="innerHTML">
-          VLANs
-        </button>
-        <button class="px-3 py-1.5 rounded bg-indigo-600 text-white"
-                hx-get="/ui/partials/{{ ip }}/lldp"
-                hx-target="#tab-content"
-                hx-trigger="click"
-                hx-swap="innerHTML">
-          LLDP
-        </button>
+<style>
+:root {
+  --s1: #161b22;
+  --s2: #1c2330;
+  --s3: #21262d;
+  --font-mono: 'IBM Plex Mono', monospace;
+  --muted: #7d8590;
+  --dim:   #484f58;
+}
+
+/* ── Page shell ─────────────────────────────────────────────────── */
+.dd-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ── Hero header ────────────────────────────────────────────────── */
+.dd-hero {
+  background: var(--s1);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.dd-hero-icon {
+  width: 46px; height: 46px;
+  border-radius: 10px;
+  background: var(--s3);
+  border: 1px solid var(--border2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--cyan);
+}
+
+.dd-hero-info { flex: 1; min-width: 0; }
+
+.dd-hero-title {
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  word-break: break-all;
+}
+
+.dd-hero-sub {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 0.25rem;
+}
+
+.dd-hero-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.dd-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.55rem;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+
+.dd-badge-alive  { color: var(--green); background: rgba(63,185,80,0.1);  border-color: rgba(63,185,80,0.25); }
+.dd-badge-down   { color: var(--red);   background: rgba(248,81,73,0.1);  border-color: rgba(248,81,73,0.25); }
+.dd-badge-type   { color: var(--cyan);  background: rgba(57,208,216,0.1); border-color: rgba(57,208,216,0.25); }
+.dd-badge-vendor { color: var(--muted); background: var(--s3);            border-color: var(--border2); }
+
+/* ── Meta grid ──────────────────────────────────────────────────── */
+.dd-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border2);
+}
+
+.dd-meta-item {}
+
+.dd-meta-label {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 0.2rem;
+}
+
+.dd-meta-value {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.dd-meta-value.muted { color: var(--muted); }
+
+/* ── Actions ────────────────────────────────────────────────────── */
+.dd-hero-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.dd-action-btn {
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  height: 30px;
+  padding: 0 0.8rem;
+  border-radius: 5px;
+  border: 1px solid var(--border2);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  text-decoration: none;
+  transition: border-color 120ms, background 120ms, color 120ms;
+  color: var(--muted);
+  background: var(--s3);
+  white-space: nowrap;
+}
+.dd-action-btn:hover { color: var(--text); border-color: var(--border); }
+.dd-action-btn.primary { color: #0d1117; background: var(--cyan); border-color: transparent; }
+.dd-action-btn.primary:hover { box-shadow: 0 0 8px rgba(57,208,216,0.3); }
+.dd-action-btn.danger  { color: var(--red); border-color: rgba(248,81,73,0.3); }
+.dd-action-btn.danger:hover { background: rgba(248,81,73,0.1); }
+
+/* ── Note widget ────────────────────────────────────────────────── */
+.dd-note-wrap {
+  background: var(--s1);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+}
+
+.dd-note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.dd-note-title {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.dd-note-status {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--green);
+  min-width: 4rem;
+  text-align: right;
+}
+
+.dd-note-textarea {
+  font-family: var(--font-mono) !important;
+  font-size: 0.78rem !important;
+  background: var(--s2) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border2) !important;
+  border-radius: 5px !important;
+  padding: 0.5rem 0.7rem !important;
+  outline: none !important;
+  resize: vertical !important;
+  min-height: 64px;
+  width: 100%;
+  transition: border-color 120ms !important;
+}
+.dd-note-textarea:focus { border-color: var(--accent) !important; }
+.dd-note-textarea::placeholder { color: var(--dim) !important; }
+
+.dd-note-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.4rem;
+}
+
+.dd-note-clear {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+.dd-note-clear:hover { color: var(--red); }
+
+/* ── Tab bar ────────────────────────────────────────────────────── */
+.dd-tabs {
+  background: var(--s1);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.dd-tab-bar {
+  display: flex;
+  border-bottom: 1px solid var(--border2);
+  background: var(--s2);
+  overflow-x: auto;
+}
+
+.dd-tab {
+  font-family: var(--font-mono);
+  font-size: 0.67rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.6rem 1.1rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--dim);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 120ms, border-color 120ms;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.dd-tab:hover { color: var(--muted); }
+.dd-tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+
+.dd-tab-count {
+  font-size: 0.58rem;
+  background: var(--s3);
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  padding: 0 0.3rem;
+}
+.dd-tab.active .dd-tab-count { background: rgba(57,208,216,0.12); border-color: rgba(57,208,216,0.3); color: var(--cyan); }
+
+/* ── Tab content ────────────────────────────────────────────────── */
+.dd-tab-content {
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+}
+
+.dd-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--dim);
+  padding: 2rem 0;
+}
+
+.dd-loading-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--cyan);
+  animation: dd-blink 1.1s ease-in-out infinite;
+}
+.dd-loading-dot:nth-child(2) { animation-delay: 0.2s; }
+.dd-loading-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dd-blink {
+  0%, 100% { opacity: 0.2; transform: scale(0.8); }
+  50%       { opacity: 1;   transform: scale(1); }
+}
+
+.dd-empty {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--dim);
+  padding: 2rem 0;
+  text-align: center;
+}
+
+/* ── Tables ─────────────────────────────────────────────────────── */
+.dd-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.dd-table th {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding: 0.45rem 0.65rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.dd-table td {
+  border-bottom: 1px solid var(--border2);
+  padding: 0.45rem 0.65rem;
+  color: var(--text);
+  vertical-align: top;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.dd-table tbody tr:hover { background: var(--s2); }
+.dd-table tbody tr:last-child td { border-bottom: none; }
+
+.dd-table td.dim { color: var(--dim); }
+.dd-table td.mono { font-family: var(--font-mono); }
+
+/* Status pills */
+.dd-pill {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 3px;
+  border: 1px solid transparent;
+}
+.dd-pill-up   { color: var(--green); background: rgba(63,185,80,0.1);  border-color: rgba(63,185,80,0.25); }
+.dd-pill-down { color: var(--red);   background: rgba(248,81,73,0.1);  border-color: rgba(248,81,73,0.25); }
+.dd-pill-warn { color: var(--amber); background: rgba(210,153,34,0.1); border-color: rgba(210,153,34,0.25); }
+
+/* ── LLDP cards ─────────────────────────────────────────────────── */
+.dd-lldp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+}
+
+.dd-lldp-card {
+  background: var(--s2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 0.75rem 0.9rem;
+}
+
+.dd-lldp-port {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--cyan);
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.03em;
+}
+
+.dd-lldp-peer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border2);
+}
+.dd-lldp-peer:last-child { border-bottom: none; padding-bottom: 0; }
+
+.dd-lldp-peer-name {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.dd-lldp-peer-meta {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--dim);
+}
+
+/* ── SNMP description ───────────────────────────────────────────── */
+.dd-descr-box {
+  background: var(--s2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 1rem;
+}
+
+/* ── Scan trigger panel ─────────────────────────────────────────── */
+.dd-scan-bar {
+  background: var(--s1);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.dd-scan-label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.dd-scan-field {
+  font-family: var(--font-mono) !important;
+  font-size: 0.72rem !important;
+  background: var(--s2) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border2) !important;
+  border-radius: 5px !important;
+  padding: 0.3rem 0.65rem !important;
+  outline: none !important;
+  width: auto !important;
+  transition: border-color 120ms !important;
+}
+.dd-scan-field:focus { border-color: var(--accent) !important; }
+
+.dd-scan-spacer { flex: 1; }
+
+.dd-scan-status {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--dim);
+}
+.dd-scan-status.running { color: var(--amber); }
+.dd-scan-status.ok      { color: var(--green); }
+.dd-scan-status.err     { color: var(--red); }
+
+/* ── Rescan progress bar ────────────────────────────────────────── */
+#dd-progress-wrap {
+  height: 2px;
+  background: var(--border2);
+  border-radius: 1px;
+  overflow: hidden;
+  display: none;
+}
+#dd-progress-bar {
+  height: 100%;
+  background: var(--cyan);
+  width: 0%;
+  transition: width 0.3s ease;
+}
+</style>
+
+<div class="dd-shell">
+
+  <!-- ═══ LOADING STATE (shown until JS runs) ══════════════════ -->
+  <div id="dd-hero-placeholder" class="dd-loading" style="padding:2rem 0;">
+    <span class="dd-loading-dot"></span>
+    <span class="dd-loading-dot"></span>
+    <span class="dd-loading-dot"></span>
+    Loading device…
+  </div>
+
+  <!-- ═══ HERO (hidden until data arrives) ════════════════════ -->
+  <div id="dd-hero" class="dd-hero" style="display:none;">
+    <div class="dd-hero-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+        <rect x="2" y="3" width="20" height="14" rx="2"/>
+        <line x1="8" y1="21" x2="16" y2="21"/>
+        <line x1="12" y1="17" x2="12" y2="21"/>
+      </svg>
+    </div>
+
+    <div class="dd-hero-info">
+      <div class="dd-hero-title" id="dd-title">{{ ip }}</div>
+      <div class="dd-hero-sub" id="dd-descr-short"></div>
+
+      <div class="dd-hero-badges">
+        <span id="dd-badge-alive" class="dd-badge" style="display:none;"></span>
+        <span id="dd-badge-type"  class="dd-badge dd-badge-type" style="display:none;"></span>
+        <span id="dd-badge-vendor" class="dd-badge dd-badge-vendor" style="display:none;"></span>
       </div>
 
-      <div id="tab-content" class="mt-4">
-        <div class="text-sm text-gray-500">Choose a tab to load data…</div>
+      <div class="dd-meta" id="dd-meta"></div>
+    </div>
+
+    <div class="dd-hero-actions">
+      <a id="dd-export-btn" href="/export/device/{{ ip }}.xlsx" class="dd-action-btn primary">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Export XLSX
+      </a>
+      <a href="/ui/map" class="dd-action-btn">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+          <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/>
+          <line x1="9" y1="3" x2="9" y2="18"/>
+          <line x1="15" y1="6" x2="15" y2="21"/>
+        </svg>
+        View on Map
+      </a>
+      <button onclick="deleteDevice()" class="dd-action-btn danger">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+          <path d="M10 11v6M14 11v6"/>
+        </svg>
+        Delete
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ NOTE ════════════════════════════════════════════════ -->
+  <div id="dd-note-section" class="dd-note-wrap" style="display:none;">
+    <div class="dd-note-header">
+      <span class="dd-note-title">Note</span>
+      <span class="dd-note-status" id="dd-note-status"></span>
+    </div>
+    <textarea
+      id="dd-note-box"
+      class="dd-note-textarea"
+      rows="2"
+      placeholder="Add a note for this device…"
+    ></textarea>
+    <div class="dd-note-footer">
+      <span style="font-family:var(--font-mono);font-size:0.6rem;color:var(--dim);">Auto-saves on change</span>
+      <button class="dd-note-clear" onclick="clearNote()">Clear note</button>
+    </div>
+  </div>
+
+  <!-- ═══ RESCAN BAR ═══════════════════════════════════════════ -->
+  <div class="dd-scan-bar">
+    <span class="dd-scan-label">Rescan</span>
+
+    <select id="dd-snmp-ver" class="dd-scan-field" style="width:80px;">
+      <option value="2c">SNMPv2c</option>
+      <option value="1">SNMPv1</option>
+    </select>
+
+    <input id="dd-community" class="dd-scan-field" type="text" value="public"
+           placeholder="community" style="width:120px;">
+
+    <input id="dd-timeout" class="dd-scan-field" type="number" value="3" min="1" max="30"
+           style="width:70px;" title="Timeout (s)">
+
+    <input id="dd-retries" class="dd-scan-field" type="number" value="2" min="0" max="10"
+           style="width:70px;" title="Retries">
+
+    <div class="dd-scan-spacer"></div>
+
+    <span id="dd-scan-status" class="dd-scan-status"></span>
+
+    <button class="dd-action-btn primary" id="dd-rescan-btn" onclick="triggerRescan()">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polyline points="1 4 1 10 7 10"/>
+        <path d="M3.51 15a9 9 0 1 0 .49-4.5"/>
+      </svg>
+      Scan Now
+    </button>
+  </div>
+
+  <!-- ═══ TABS ════════════════════════════════════════════════ -->
+  <div class="dd-tabs">
+    <div class="dd-tab-bar">
+      <button class="dd-tab active" data-tab="interfaces" onclick="switchTab('interfaces', this)">
+        Interfaces <span class="dd-tab-count" id="tc-interfaces">—</span>
+      </button>
+      <button class="dd-tab" data-tab="vlans" onclick="switchTab('vlans', this)">
+        VLANs <span class="dd-tab-count" id="tc-vlans">—</span>
+      </button>
+      <button class="dd-tab" data-tab="lldp" onclick="switchTab('lldp', this)">
+        LLDP Neighbors <span class="dd-tab-count" id="tc-lldp">—</span>
+      </button>
+      <button class="dd-tab" data-tab="endpoints" onclick="switchTab('endpoints', this)">
+        Endpoints <span class="dd-tab-count" id="tc-endpoints">—</span>
+      </button>
+    </div>
+
+
+    <div class="dd-tab-content" id="dd-tab-body">
+      <div class="dd-loading">
+        <span class="dd-loading-dot"></span>
+        <span class="dd-loading-dot"></span>
+        <span class="dd-loading-dot"></span>
+        Loading…
       </div>
     </div>
   </div>
+
+</div>
+
+<script>
+(function(){
+'use strict';
+
+var IP = '{{ ip }}';
+var API_KEY = '{{ api_key|default("") }}';
+var _cache = {};
+var _currentTab = 'interfaces';
+var _noteTimer = null;
+var _scanPollTimer = null;
+
+/* ── Boot ────────────────────────────────────────────────────────── */
+loadDevice();
+loadNote();
+
+/* ── Device header ───────────────────────────────────────────────── */
+function loadDevice() {
+  fetch('/api/devices/' + encodeURIComponent(IP), { credentials: 'include' })
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
+    .then(function(data) {
+      var d = data.device || {};
+      var p = data.latest_payload || {};
+
+      renderHero(d, p);
+      loadTab('interfaces');
+    })
+    .catch(function(err) {
+      document.getElementById('dd-hero-placeholder').innerHTML =
+        '<span style="color:var(--red);font-family:var(--font-mono);font-size:.8rem;">Failed to load device: ' + escapeHTML(err.message) + '</span>';
+    });
+}
+
+function renderHero(d, p) {
+  document.getElementById('dd-hero-placeholder').style.display = 'none';
+  document.getElementById('dd-hero').style.display = '';
+  document.getElementById('dd-note-section').style.display = '';
+
+  /* Title: prefer sys_name, fallback to IP */
+  var sysName = p.sys_name || d.sys_name || '';
+  document.getElementById('dd-title').textContent = sysName || IP;
+
+  /* Short description line */
+  var shortDescr = '';
+  if (sysName && sysName !== IP) shortDescr = IP;
+  if (d.first_seen) shortDescr += (shortDescr ? ' · ' : '') + 'First seen ' + fmtTime(d.first_seen);
+  if (d.last_seen)  shortDescr += (shortDescr ? ' · ' : '') + 'Last seen '  + fmtTime(d.last_seen);
+  document.getElementById('dd-descr-short').textContent = shortDescr;
+
+  /* Alive badge */
+  var aliveEl = document.getElementById('dd-badge-alive');
+  if (d.last_alive !== undefined && d.last_alive !== null) {
+    aliveEl.style.display = '';
+    aliveEl.textContent = d.last_alive ? '● Alive' : '● Unreachable';
+    aliveEl.className = 'dd-badge ' + (d.last_alive ? 'dd-badge-alive' : 'dd-badge-down');
+  }
+
+  /* Type badge from sys_descr hints */
+  var typeEl = document.getElementById('dd-badge-type');
+  var descr = p.sys_descr || d.sys_descr || '';
+  var devType = guessType(descr, sysName);
+  if (devType) {
+    typeEl.style.display = '';
+    typeEl.textContent = devType;
+  }
+
+  /* Vendor badge */
+  var vendorEl = document.getElementById('dd-badge-vendor');
+  var vendor = guessVendor(descr, sysName);
+  if (vendor) {
+    vendorEl.style.display = '';
+    vendorEl.textContent = vendor;
+  }
+
+  /* Meta grid */
+  var meta = [];
+  if (IP)              meta.push(['IP Address', IP]);
+  if (sysName && sysName !== IP) meta.push(['SNMP Name', sysName]);
+  if (d.first_seen)    meta.push(['First Seen', fmtTime(d.first_seen)]);
+  if (d.last_seen)     meta.push(['Last Seen',  fmtTime(d.last_seen)]);
+  if (descr)           meta.push(['Description', descr.slice(0, 120) + (descr.length > 120 ? '…' : '')]);
+
+  var ifaces = (p.interfaces || []);
+  var upCount = ifaces.filter(function(i){ return i.oper === 'up'; }).length;
+  if (ifaces.length) meta.push(['Interfaces', upCount + ' up / ' + ifaces.length + ' total']);
+
+  var vlans = (p.vlans || []);
+  if (vlans.length) meta.push(['VLANs', vlans.length + ' configured']);
+
+  var lldp = p.lldp_neighbors || {};
+  var lldpCount = Object.keys(lldp).length;
+  if (lldpCount) meta.push(['LLDP Ports', lldpCount + ' with neighbors']);
+
+  var metaEl = document.getElementById('dd-meta');
+  metaEl.innerHTML = meta.map(function(pair) {
+    return '<div class="dd-meta-item">' +
+      '<div class="dd-meta-label">' + escapeHTML(pair[0]) + '</div>' +
+      '<div class="dd-meta-value">' + escapeHTML(pair[1]) + '</div>' +
+      '</div>';
+  }).join('');
+
+  /* Store full descr for overview tab */
+  _cache._descr = descr;
+  _cache._device = d;
+  _cache._payload = p;
+
+  /* Pre-fill tab counts from cached payload */
+  setCount('interfaces', ifaces.length);
+  setCount('vlans', vlans.length);
+  setCount('lldp', lldpCount);
+}
+
+/* ── Tabs ────────────────────────────────────────────────────────── */
+function switchTab(name, btn) {
+  _currentTab = name;
+  document.querySelectorAll('.dd-tab').forEach(function(el) { el.classList.remove('active'); });
+  btn.classList.add('active');
+  loadTab(name);
+}
+
+function loadTab(name) {
+  var body = document.getElementById('dd-tab-body');
+  if (_cache[name]) { body.innerHTML = _cache[name]; return; }
+  body.innerHTML = loadingHTML();
+
+  if (name === 'interfaces') fetchInterfaces();
+  else if (name === 'vlans') fetchVlans();
+  else if (name === 'lldp')  fetchLldp();
+  else if (name === 'endpoints') fetchEndpoints();
+}
+
+function setCount(tab, n) {
+  var el = document.getElementById('tc-' + tab);
+  if (el) el.textContent = n;
+}
+
+/* ── Interfaces ──────────────────────────────────────────────────── */
+function fetchInterfaces() {
+  var p = (_cache._payload || {});
+  var rows = p.interfaces || [];
+
+  if (rows.length) {
+    renderInterfaces(rows);
+    return;
+  }
+  /* fallback: hit API */
+  fetch('/ui/partials/' + encodeURIComponent(IP) + '/interfaces', { credentials: 'include' })
+    .then(function(r) { return r.text(); })
+    .then(function(html) {
+      _cache['interfaces'] = html;
+      document.getElementById('dd-tab-body').innerHTML = html;
+    })
+    .catch(function(e) { showErr('interfaces', e); });
+}
+
+function renderInterfaces(rows) {
+  setCount('interfaces', rows.length);
+  var html = '<div style="overflow-x:auto;">' +
+    '<table class="dd-table">' +
+    '<thead><tr>' +
+    '<th>Idx</th><th>Name</th><th>Alias</th><th>Admin/Oper</th>' +
+    '<th>Speed</th><th>MTU</th><th>VLAN</th>' +
+    '<th>In</th><th>Out</th><th>Errors</th>' +
+    '<th>MAC</th><th>Last Change</th>' +
+    '</tr></thead><tbody>';
+
+  rows.forEach(function(r) {
+    var adm = r.admin || '—';
+    var opr = r.oper  || '—';
+    html += '<tr>' +
+      '<td class="dim">'  + escapeHTML(String(r.ifIndex || '')) + '</td>' +
+      '<td style="font-weight:600;color:var(--cyan);">' + escapeHTML(r.name || '—') + '</td>' +
+      '<td class="dim">'  + escapeHTML(r.alias || '—') + '</td>' +
+      '<td>' + pill(adm) + ' / ' + pill(opr) + '</td>' +
+      '<td class="dim">'  + escapeHTML(r.speed || '—') + '</td>' +
+      '<td class="dim">'  + escapeHTML(String(r.mtu || '—')) + '</td>' +
+      '<td class="dim">'  + escapeHTML(r.pvid != null ? String(r.pvid) : '—') + '</td>' +
+      '<td class="dim">'  + escapeHTML(String(r.in_bytes  || 0)) + '</td>' +
+      '<td class="dim">'  + escapeHTML(String(r.out_bytes || 0)) + '</td>' +
+      '<td class="dim">'  + escapeHTML(String(r.in_err||0) + '/' + String(r.out_err||0)) + '</td>' +
+      '<td style="font-family:var(--font-mono);font-size:.65rem;">' + escapeHTML(fmtMac(r.mac)) + '</td>' +
+      '<td class="dim">'  + escapeHTML(r.last_change || '—') + '</td>' +
+      '</tr>';
+  });
+
+  if (!rows.length) {
+    html += '<tr><td colspan="12" class="dd-empty">No interface data.</td></tr>';
+  }
+
+  html += '</tbody></table></div>';
+  _cache['interfaces'] = html;
+  if (_currentTab === 'interfaces') document.getElementById('dd-tab-body').innerHTML = html;
+}
+
+/* ── VLANs ───────────────────────────────────────────────────────── */
+function fetchVlans() {
+  fetch('/ui/partials/' + encodeURIComponent(IP) + '/vlans', { credentials: 'include' })
+    .then(function(r) { return r.text(); })
+    .then(function(html) {
+      /* wrap in dark theme */
+      var wrapped = '<div style="overflow-x:auto;">' + html + '</div>';
+      _cache['vlans'] = wrapped;
+      if (_currentTab === 'vlans') document.getElementById('dd-tab-body').innerHTML = wrapped;
+      /* count from payload */
+      var p = _cache._payload || {};
+      setCount('vlans', (p.vlans || []).length);
+    })
+    .catch(function(e) { showErr('vlans', e); });
+}
+
+/* ── LLDP ────────────────────────────────────────────────────────── */
+function fetchLldp() {
+  var p = (_cache._payload || {});
+  var lldp = p.lldp_neighbors || {};
+  renderLldp(lldp);
+}
+
+function renderLldp(lldp) {
+  var keys = Object.keys(lldp);
+  setCount('lldp', keys.length);
+
+  var html = '';
+  if (!keys.length) {
+    html = '<div class="dd-empty">No LLDP neighbors found.</div>';
+  } else {
+    html = '<div class="dd-lldp-grid">';
+    keys.forEach(function(port) {
+      var peers = lldp[port] || [];
+      html += '<div class="dd-lldp-card">' +
+        '<div class="dd-lldp-port">🔌 ' + escapeHTML(port) + '</div>';
+      peers.forEach(function(peer) {
+        html += '<div class="dd-lldp-peer">' +
+          '<div class="dd-lldp-peer-name">' + escapeHTML(peer.sysName || '?') + '</div>' +
+          '<div class="dd-lldp-peer-meta">' +
+            'Port: ' + escapeHTML(peer.portId || '?') +
+            (peer.portDesc ? ' · ' + escapeHTML(peer.portDesc) : '') +
+          '</div>' +
+          '</div>';
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  _cache['lldp'] = html;
+  if (_currentTab === 'lldp') document.getElementById('dd-tab-body').innerHTML = html;
+}
+
+/* ── Endpoints ───────────────────────────────────────────────────── */
+function fetchEndpoints() {
+  var comm    = document.getElementById('dd-community').value || 'public';
+  var ver     = document.getElementById('dd-snmp-ver').value || '2c';
+  var timeout = document.getElementById('dd-timeout').value || 3;
+  var retries = document.getElementById('dd-retries').value || 2;
+
+  var url = '/ui/partials/' + encodeURIComponent(IP) + '/interfaces?' +
+    'community=' + encodeURIComponent(comm) + '&version=' + encodeURIComponent(ver) +
+    '&timeout=' + timeout + '&retries=' + retries;
+
+  /* Use stored endpoints from payload if available */
+  var p = _cache._payload || {};
+  var endpoints = p.endpoints || [];
+  if (endpoints.length) {
+    renderEndpoints(endpoints);
+    return;
+  }
+
+  /* Otherwise fetch live */
+  fetch('/api/devices/' + encodeURIComponent(IP) + '/endpoints?' +
+    'community=' + encodeURIComponent(comm) + '&version=' + encodeURIComponent(ver) +
+    '&timeout=' + timeout + '&retries=' + retries,
+    { credentials: 'include' }
+  )
+    .then(function(r) { return r.json(); })
+    .then(function(data) { renderEndpoints(data.endpoints || []); })
+    .catch(function(e) { showErr('endpoints', e); });
+}
+
+function renderEndpoints(rows) {
+  setCount('endpoints', rows.length);
+  var html = '<div style="overflow-x:auto;">' +
+    '<table class="dd-table">' +
+    '<thead><tr><th>MAC</th><th>Vendor</th><th>VLAN</th><th>Interface</th><th>Status</th></tr></thead>' +
+    '<tbody>';
+
+  rows.forEach(function(r) {
+    html += '<tr>' +
+      '<td style="font-family:var(--font-mono);font-size:.68rem;">' + escapeHTML(r.mac || '—') + '</td>' +
+      '<td class="dim">' + escapeHTML(r.vendor || '—') + '</td>' +
+      '<td class="dim">' + escapeHTML(r.vlan != null ? String(r.vlan) : '—') + '</td>' +
+      '<td style="color:var(--cyan);">' + escapeHTML(r.ifName || (r.ifIndex != null ? 'idx ' + r.ifIndex : '—')) + '</td>' +
+      '<td>' + pill(r.status || '—') + '</td>' +
+      '</tr>';
+  });
+
+  if (!rows.length) {
+    html += '<tr><td colspan="5" class="dd-empty">No endpoint data. Try rescanning with SNMP credentials.</td></tr>';
+  }
+
+  html += '</tbody></table></div>';
+  _cache['endpoints'] = html;
+  if (_currentTab === 'endpoints') document.getElementById('dd-tab-body').innerHTML = html;
+}
+
+/* ── Note ────────────────────────────────────────────────────────── */
+function loadNote() {
+  fetch('/api/devices/' + encodeURIComponent(IP) + '/note', { credentials: 'include' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      document.getElementById('dd-note-box').value = d.note || '';
+    })
+    .catch(function() {});
+
+  document.getElementById('dd-note-box').addEventListener('input', function() {
+    clearTimeout(_noteTimer);
+    _noteTimer = setTimeout(saveNote, 600);
+  });
+}
+
+function saveNote() {
+  var note = document.getElementById('dd-note-box').value;
+  var statusEl = document.getElementById('dd-note-status');
+  statusEl.textContent = 'Saving…';
+  statusEl.style.color = 'var(--muted)';
+  fetch('/api/devices/' + encodeURIComponent(IP) + '/note', {
+    method: 'PUT',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'note=' + encodeURIComponent(note),
+  })
+    .then(function() {
+      statusEl.textContent = 'Saved ✓';
+      statusEl.style.color = 'var(--green)';
+      setTimeout(function(){ statusEl.textContent = ''; }, 2000);
+    })
+    .catch(function() {
+      statusEl.textContent = 'Save failed';
+      statusEl.style.color = 'var(--red)';
+    });
+}
+
+function clearNote() {
+  document.getElementById('dd-note-box').value = '';
+  fetch('/api/devices/' + encodeURIComponent(IP) + '/note', {
+    method: 'DELETE',
+    credentials: 'include',
+  }).catch(function(){});
+  var statusEl = document.getElementById('dd-note-status');
+  statusEl.textContent = 'Cleared';
+  statusEl.style.color = 'var(--muted)';
+  setTimeout(function(){ statusEl.textContent = ''; }, 2000);
+}
+
+/* ── Rescan ──────────────────────────────────────────────────────── */
+function triggerRescan() {
+  var btn = document.getElementById('dd-rescan-btn');
+  btn.disabled = true;
+
+  var comm    = document.getElementById('dd-community').value || 'public';
+  var ver     = document.getElementById('dd-snmp-ver').value  || '2c';
+  var timeout = document.getElementById('dd-timeout').value   || 3;
+  var retries = document.getElementById('dd-retries').value   || 2;
+
+  setScanStatus('Scanning\u2026 (this may take ~30s)', 'running');
+
+  var form = new FormData();
+  form.append('mode',         'host');
+  form.append('target',       IP);
+  form.append('port',         '161');
+  form.append('timeout',      String(timeout));
+  form.append('retries',      String(retries));
+  form.append('snmp_version', ver);
+  form.append('community',    comm);
+  form.append('max_ports',    '52');
+  form.append('vlan_ports',   'label');
+
+  fetch('/ui/scan', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'X-API-Key': API_KEY },
+    body: form,
+  })
+    .then(function(r) {
+      if (r.status >= 500) throw new Error('Server error ' + r.status);
+      if (r.status === 400 || r.status === 504) {
+        return r.text().then(function(html) {
+          var tmp = document.createElement('div');
+          tmp.innerHTML = html;
+          var errEl = tmp.querySelector('.scan-error,.error');
+          throw new Error(errEl ? errEl.textContent.trim() : 'Scan failed \u2014 check SNMP credentials');
+        });
+      }
+      return r.text();
+    })
+    .then(function() {
+      setScanStatus('Done \u2713 \u2014 reloading\u2026', 'ok');
+      _cache = {};
+      loadDevice();
+      setTimeout(function() {
+        loadTab(_currentTab);
+        setScanStatus('', '');
+      }, 600);
+      btn.disabled = false;
+    })
+    .catch(function(e) {
+      setScanStatus('Error: ' + e.message, 'err');
+      btn.disabled = false;
+    });
+}
+
+function setScanStatus(msg, cls) {
+  var el = document.getElementById('dd-scan-status');
+  el.textContent = msg;
+  el.className = 'dd-scan-status' + (cls ? ' ' + cls : '');
+}
+
+/* \u2500\u2500 Delete \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+function deleteDevice() {
+  if (!confirm('Delete device ' + IP + ' from the database? This cannot be undone.')) return;
+  /* DELETE returns an HTML fragment (HTMX-designed) — any 2xx means success */
+  fetch('/api/devices/' + encodeURIComponent(IP), {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+    .then(function(r) {
+      /* DELETE returns HTML fragment — treat any response as success and redirect */
+      window.location.href = '/devices/ui';
+    })
+    .catch(function(e) { alert('Delete failed: ' + e.message); });
+}
+
+
+/* ── Helpers ──────────────────────────────────────────────────────── */
+function pill(val) {
+  if (!val || val === '—') return '<span class="dd-pill dd-pill-warn">—</span>';
+  var v = val.toLowerCase();
+  if (v === 'up'   || v === 'dynamic') return '<span class="dd-pill dd-pill-up">'   + escapeHTML(val) + '</span>';
+  if (v === 'down' || v === 'static')  return '<span class="dd-pill dd-pill-down">'  + escapeHTML(val) + '</span>';
+  return '<span class="dd-pill dd-pill-warn">' + escapeHTML(val) + '</span>';
+}
+
+function fmtMac(mac) {
+  if (!mac) return '—';
+  if (typeof mac === 'string') return mac;
+  if (Array.isArray(mac)) {
+    return mac.map(function(b){ return ('0'+Number(b).toString(16)).slice(-2); }).join(':');
+  }
+  return String(mac);
+}
+
+function fmtTime(ts) {
+  if (!ts) return '';
+  try {
+    var d = new Date(ts.includes('T') ? ts : ts + 'Z');
+    return d.toLocaleString();
+  } catch(e) { return ts; }
+}
+
+function guessType(descr, name) {
+  var s = (descr + ' ' + name).toLowerCase();
+  if (s.includes('router') || s.includes('cisco ios') || s.includes('junos')) return 'Router';
+  if (s.includes('switch') || s.includes('catalyst') || s.includes('nexus')) return 'Switch';
+  if (s.includes('access point') || s.includes(' ap ') || s.includes('wireless')) return 'Access Point';
+  if (s.includes('firewall') || s.includes('asa') || s.includes('palo alto')) return 'Firewall';
+  if (s.includes('linux') || s.includes('windows') || s.includes('ubuntu')) return 'Host';
+  return '';
+}
+
+function guessVendor(descr, name) {
+  var s = (descr + ' ' + name).toLowerCase();
+  if (s.includes('cisco'))   return 'Cisco';
+  if (s.includes('juniper') || s.includes('junos')) return 'Juniper';
+  if (s.includes('aruba'))   return 'Aruba';
+  if (s.includes('ubiquiti') || s.includes('unifi')) return 'Ubiquiti';
+  if (s.includes('mikrotik')) return 'MikroTik';
+  if (s.includes('fortinet') || s.includes('fortigate')) return 'Fortinet';
+  if (s.includes('palo alto')) return 'Palo Alto';
+  if (s.includes('arista'))  return 'Arista';
+  if (s.includes('hp') || s.includes('hewlett')) return 'HP';
+  if (s.includes('dell'))    return 'Dell';
+  return '';
+}
+
+function loadingHTML() {
+  return '<div class="dd-loading">' +
+    '<span class="dd-loading-dot"></span>' +
+    '<span class="dd-loading-dot"></span>' +
+    '<span class="dd-loading-dot"></span>' +
+    'Loading…</div>';
+}
+
+function showErr(tab, err) {
+  var html = '<div class="dd-empty" style="color:var(--red);">Failed to load ' + tab + ': ' + escapeHTML(err.message) + '</div>';
+  _cache[tab] = html;
+  if (_currentTab === tab) document.getElementById('dd-tab-body').innerHTML = html;
+}
+
+function escapeHTML(str) {
+  return String(str || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+  /* Expose button handlers globally (called from onclick attributes) */
+  window.triggerRescan = triggerRescan;
+  window.deleteDevice  = deleteDevice;
+  window.clearNote     = clearNote;
+  window.switchTab     = switchTab;
+
+})();
+</script>
 {% endblock %}

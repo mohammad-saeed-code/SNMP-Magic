@@ -7,79 +7,455 @@
 
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 
 <style>
-  .card { background: white; border-radius: 0.75rem; box-shadow: 0 10px 20px rgba(0,0,0,.06); padding: 1rem; }
-  .pill { font-size: 0.75rem; padding: .125rem .5rem; border-radius: 999px; }
-  .pill-ok { background: #dcfce7; color: #166534; }
-  .pill-bad { background: #fee2e2; color: #991b1b; }
-  .table { width: 100%; font-size: .9rem; }
-  .table th { text-align: left; font-weight: 600; border-bottom: 1px solid #e5e7eb; padding: .5rem .25rem; }
-  .table td { border-bottom: 1px solid #f3f4f6; padding: .5rem .25rem; vertical-align: top; }
-  .kbd { display: inline-block; border-radius: .375rem; background: #f3f4f6; padding: .1rem .4rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .75rem; color: #374151; }
+  :root {
+    --bg:        #0d1117;
+    --surface:   #161b22;
+    --surface2:  #1c2330;
+    --border:    #30363d;
+    --border2:   #21262d;
+    --text:      #e6edf3;
+    --text-muted:#7d8590;
+    --text-dim:  #484f58;
+    --cyan:      #39d0d8;
+    --cyan-dim:  #1a4f53;
+    --green:     #3fb950;
+    --green-dim: #1a3a21;
+    --red:       #f85149;
+    --red-dim:   #3d1c1c;
+    --amber:     #d29922;
+    --amber-dim: #3d2f0a;
+    --accent:    #2f81f7;
+  }
 
-  /* HTMX top loading bar */
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    min-height: 100vh;
+    /* subtle scanline texture */
+    background-image:
+      repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(255,255,255,0.012) 2px,
+        rgba(255,255,255,0.012) 4px
+      );
+  }
+
+  /* ─── HTMX progress bar ─────────────────────────────────────────── */
   #htmx-progress {
-    position: fixed; top: 0; left: 0; height: 3px; width: 0;
-    background: #4f46e5; /* indigo-600 */
-    opacity: 0; transition: width 160ms ease, opacity 220ms ease;
+    position: fixed; top: 0; left: 0;
+    height: 2px; width: 0;
+    background: linear-gradient(90deg, var(--cyan), var(--accent));
+    box-shadow: 0 0 8px var(--cyan);
+    opacity: 0;
+    transition: width 160ms ease, opacity 220ms ease;
     z-index: 9999;
+  }
+
+  /* ─── Header ─────────────────────────────────────────────────────── */
+  #app-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    box-shadow: 0 1px 0 var(--border2), 0 4px 20px rgba(0,0,0,.4);
+  }
+
+  .header-inner {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 1.25rem;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  /* Brand */
+  .brand {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--cyan);
+    letter-spacing: -0.01em;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  .brand::before {
+    content: '';
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 6px var(--cyan);
+    animation: pulse-dot 2.4s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; box-shadow: 0 0 6px var(--cyan); }
+    50%       { opacity: 0.5; box-shadow: 0 0 2px var(--cyan); }
+  }
+
+  /* Separator */
+  .header-sep {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+    flex-shrink: 0;
+  }
+
+  /* Nav */
+  .app-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+    flex: 1;
+  }
+
+  .nav-link {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: var(--text-muted);
+    text-decoration: none;
+    padding: 0.3rem 0.7rem;
+    border-radius: 5px;
+    border: 1px solid transparent;
+    transition: color 120ms, background 120ms, border-color 120ms;
+    white-space: nowrap;
+  }
+
+  .nav-link:hover {
+    color: var(--text);
+    background: var(--surface2);
+    border-color: var(--border2);
+  }
+
+  .nav-link[aria-current="page"] {
+    color: var(--cyan);
+    background: var(--cyan-dim);
+    border-color: rgba(57,208,216,0.25);
+    font-weight: 500;
+  }
+
+  /* Logout button */
+  .btn-logout {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 0.3rem 0.75rem;
+    cursor: pointer;
+    transition: color 120ms, border-color 120ms, background 120ms;
+    letter-spacing: 0.03em;
+    flex-shrink: 0;
+  }
+
+  .btn-logout:hover {
+    color: var(--red);
+    border-color: var(--red);
+    background: var(--red-dim);
+  }
+
+  /* ─── Cards ─────────────────────────────────────────────────────── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 1.25rem;
+    transition: border-color 160ms;
+  }
+
+  .card:hover { border-color: var(--border); }
+
+  .card-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+  }
+
+  /* ─── Pills / Badges ─────────────────────────────────────────────── */
+  .pill {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 500;
+    padding: 0.15rem 0.55rem;
+    border-radius: 4px;
+    letter-spacing: 0.04em;
+    border: 1px solid transparent;
+  }
+
+  .pill-ok {
+    color: var(--green);
+    background: var(--green-dim);
+    border-color: rgba(63,185,80,0.25);
+  }
+
+  .pill-bad {
+    color: var(--red);
+    background: var(--red-dim);
+    border-color: rgba(248,81,73,0.25);
+  }
+
+  .pill-warn {
+    color: var(--amber);
+    background: var(--amber-dim);
+    border-color: rgba(210,153,34,0.25);
+  }
+
+  /* ─── Tables ─────────────────────────────────────────────────────── */
+  .table {
+    width: 100%;
+    font-size: 0.83rem;
+    border-collapse: collapse;
+  }
+
+  .table th {
+    text-align: left;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    padding: 0.55rem 0.6rem;
+  }
+
+  .table td {
+    border-bottom: 1px solid var(--border2);
+    padding: 0.55rem 0.6rem;
+    vertical-align: top;
+    color: var(--text);
+  }
+
+  .table tbody tr {
+    transition: background 100ms;
+  }
+
+  .table tbody tr:hover {
+    background: var(--surface2);
+  }
+
+  /* ─── Kbd ────────────────────────────────────────────────────────── */
+  .kbd {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    background: var(--surface2);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.1rem 0.4rem;
+    box-shadow: 0 1px 0 var(--border);
+  }
+
+  /* ─── Utility: section heading ───────────────────────────────────── */
+  .section-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+  }
+
+  /* ─── Buttons ────────────────────────────────────────────────────── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 500;
+    padding: 0.4rem 0.9rem;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: opacity 120ms, box-shadow 120ms;
+    text-decoration: none;
+  }
+
+  .btn:active { opacity: 0.8; }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 0 0 0 rgba(47,129,247,0);
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 0 0 3px rgba(47,129,247,0.25);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-muted);
+    border-color: var(--border);
+  }
+
+  .btn-ghost:hover {
+    color: var(--text);
+    border-color: var(--border);
+    background: var(--surface2);
+  }
+
+  /* ─── Inputs ─────────────────────────────────────────────────────── */
+  input, select, textarea {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color 120ms, box-shadow 120ms;
+    width: 100%;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(47,129,247,0.15);
+  }
+
+  /* ─── Scrollbar ──────────────────────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+  /* ─── Main / footer ──────────────────────────────────────────────── */
+  #app-main {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 1.75rem 1.25rem;
+    animation: fade-up 220ms ease both;
+  }
+
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  #app-footer {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 1.5rem 1.25rem;
+    border-top: 1px solid var(--border2);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .footer-text {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    letter-spacing: 0.03em;
+  }
+
+  .footer-stack {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .footer-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    padding: 0.1rem 0.45rem;
   }
 </style>
 </head>
 
-<body class="bg-gray-50 text-gray-900">
+<body>
   <div id="htmx-progress"></div>
 
-  <header class="bg-indigo-600 text-white sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-      <a href="/" class="font-semibold tracking-wide">snmp-magic</a>
+  <header id="app-header">
+    <div class="header-inner">
+
+      <a href="/" class="brand">snmp-magic</a>
+
+      <div class="header-sep"></div>
 
       {% set active = active|default('') %}
       {% macro nav(href, key, label) -%}
         <a href="{{ href }}"
-           class="text-sm px-2 py-1 rounded hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40
-                  {{ 'bg-white/15 font-semibold' if active==key else '' }}"
+           class="nav-link"
            {% if active==key %}aria-current="page"{% endif %}>
           {{ label }}
         </a>
       {%- endmacro %}
 
-      <nav class="flex items-center gap-1">
+      <nav class="app-nav">
         {{ nav('/', 'dashboard', 'Dashboard') }}
         {{ nav('/devices/ui', 'devices', 'Devices') }}
         {{ nav('/topology/ui', 'topology', 'Topology') }}
-        {{ nav('/schedules/ui', 'schedules', 'Scheduled Scans') }}
+        {{ nav('/schedules/ui', 'schedules', 'Schedules') }}
         {{ nav('/ui/settings', 'settings', 'Settings') }}
-
+        {{ nav('/ui/map', 'map', 'Map') }}
       </nav>
+
       <form
         hx-post="/api/auth/logout"
         hx-trigger="submit"
         hx-swap="none"
         hx-on::after-request="window.location.href='/'"
+        style="margin:0"
       >
-        <button
-          type="submit"
-          class="text-sm px-3 py-1.5 rounded bg-white/10 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white/40"
-        >
-          Logout
-        </button>
+        <button type="submit" class="btn-logout">logout</button>
       </form>
+
     </div>
   </header>
 
-  <main class="max-w-7xl mx-auto px-4 py-6">
+  <main id="app-main">
     {% block content %}{% endblock %}
   </main>
 
-  <footer class="max-w-7xl mx-auto px-4 py-6 text-xs text-gray-500">
-    Built with FastAPI · HTMX · Tailwind
+  <footer id="app-footer">
+    <span class="footer-text">snmp-magic</span>
+    <div class="footer-stack">
+      <span class="footer-tag">FastAPI</span>
+      <span class="footer-tag">HTMX</span>
+      <span class="footer-tag">Tailwind</span>
+    </div>
   </footer>
 
 <script>
 (function(){
-  // Global HTMX progress bar
   var bar = document.getElementById('htmx-progress');
   var t = null;
 
